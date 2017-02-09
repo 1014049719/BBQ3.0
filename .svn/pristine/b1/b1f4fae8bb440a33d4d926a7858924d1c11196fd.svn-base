@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.XIB" version="3.0" toolsVersion="9531" systemVersion="14F27" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES">
+    <dependencies>
+        <deployment identifier="iOS"/>
+        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="9529"/>
+    </dependencies>
+    <objects>
+        <placeholder placeholderIdentifier="IBFilesOwner" id="-1" userLabel="File's Owner" customClass="WelcomePage2"/>
+        <placeholder placeholderIdentifier="IBFirstResponder" id="-2" customClass="UIResponder"/>
+        <view contentMode="scaleToFill" id="50Z-3C-wrD" customClass="MYIntroductionPanel">
+            <rect key="frame" x="0.0" y="0.0" width="320" height="568"/>
+            <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+            <subviews>
+                <imageView userInteractionEnabled="NO" contentMode="scaleToFill" horizontalHuggingPriority="251" verticalHuggingPriority="251" image="yijianyaoqing" translatesAutoresizingMaskIntoConstraints="NO" id="JTZ-mk-IWB">
+                    <rect key="frame" x="4" y="198" width="312" height="378"/>
+                    <constraints>
+                        <constraint firstAttribute="width" constant="312" id="ZdB-Iy-fZd"/>
+                        <constraint firstAttribute="height" constant="378" id="h1j-Mu-AqT"/>
+                    </constraints>
+                </imageView>
+                <imageView userInteractionEnabled="NO" contentMode="scaleToFill" horizontalHuggingPriority="251" verticalHuggingPriority="251" image="yijianyaoqingjiazhang" translatesAutoresizingMaskIntoConstraints="NO" id="sS0-5h-RRa">
+                    <rect key="frame" x="31" y="129" width="259" height="14"/>
+                    <constraints>
+                        <constraint firstAttribute="height" constant="14" id="5ms-Ur-9qI"/>
+                        <constraint firstAttribute="width" constant="259" id="y2F-x7-f01"/>
+                    </constraints>
+                </imageView>
+                <imageView userInteractionEnabled="NO" contentMode="scaleToFill" horizontalHuggingPriority="251" verticalHuggingPriority="251" image="yaoqingjiazhangjiaru" translatesAutoresizingMaskIntoConstraints="NO" id="a9W-8r-lrr">
+                    <rect key="frame" x="48" y="90" width="224" height="27"/>
+                    <constraints>
+                        <constraint firstAttribute="width" constant="224" id="3Di-Fs-fGL"/>
+                        <constraint firstAttribute="height" constant="27" id="t8L-nR-vKA"/>
+                    </constraints>
+                </imageView>
+            </subviews>
+            <color key="backgroundColor" white="1" alpha="1" colorSpace="calibratedWhite"/>
+            <constraints>
+                <constraint firstItem="sS0-5h-RRa" firstAttribute="centerY" secondItem="50Z-3C-wrD" secondAttribute="centerY" constant="-148" id="1T1-vz-eYY"/>
+                <constraint firstItem="JTZ-mk-IWB" firstAttribute="centerY" secondItem="50Z-3C-wrD" secondAttribute="centerY" constant="103" id="4ST-HC-n0U"/>
+                <constraint firstItem="sS0-5h-RRa" firstAttribute="top" secondItem="a9W-8r-lrr" secondAttribute="bottom" constant="12" id="FKa-pw-fgG"/>
+                <constraint firstItem="a9W-8r-lrr" firstAttribute="centerX" secondItem="sS0-5h-RRa" secondAttribute="centerX" id="fg8-1k-jKP"/>
+                <constraint firstItem="JTZ-mk-IWB" firstAttribute="centerX" secondItem="50Z-3C-wrD" secondAttribute="centerX" id="pMz-jl-XEi"/>
+                <constraint firstItem="sS0-5h-RRa" firstAttribute="centerX" secondItem="JTZ-mk-IWB" secondAttribute="centerX" id="pjY-CH-7tJ"/>
+            </constraints>
+            <point key="canvasLocation" x="311" y="313"/>
+        </view>
+    </objects>
+    <resources>
+        <image name="yaoqingjiazhangjiaru" width="223" height="25"/>
+        <image name="yijianyaoqing" width="375" height="443"/>
+        <image name="yijianyaoqingjiazhang" width="293" height="14"/>
+    </resources>
+</document>

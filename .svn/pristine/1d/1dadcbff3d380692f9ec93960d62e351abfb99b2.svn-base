@@ -1,0 +1,336 @@
+//
+//  BBQCreateLeaveViewController.m
+//  BBQ
+//
+//  Created by slovelys on 15/11/30.
+//  Copyright © 2015年 bbq. All rights reserved.
+//
+
+#import "BBQCreateLeaveViewController.h"
+#import "UIPlaceHolderTextView.h"
+#import "BBQCreateLeaveCell.h"
+#import "DatePicker.h"
+#import "BBQBabyPickerViewController.h"
+#import "BBQCreateLeaveApi.h"
+#import "NSString+Common.h"
+
+@interface BBQCreateLeaveViewController () <UITableViewDataSource, UITableViewDelegate, UITextViewDelegate>
+@property (weak, nonatomic) IBOutlet UIPlaceHolderTextView *textView;
+@property (weak, nonatomic) IBOutlet UITableView *tableView;
+@property (weak, nonatomic) IBOutlet UIButton *sureButton;
+@property (strong, nonatomic) NSMutableArray *leftAry;
+@property (strong, nonatomic) NSMutableArray *rightAry;
+@property (strong, nonatomic) DatePicker *datePicker;
+@property (copy, nonatomic) NSString *startTime;
+@property (copy, nonatomic) NSString *endTime;
+@property (strong, nonatomic) UIView *overlayView;
+@property (strong, nonatomic) BBQBabyPickerViewController *babyPicker;
+@property (strong, nonatomic) BBQBabyModel *selectModel;
+@property (strong, nonatomic) NSMutableArray *schoolModelAry;
+
+@end
+
+@implementation BBQCreateLeaveViewController
+
+
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    // Do any additional setup after loading the view.
+    self.title = @"新建请假";
+    _sureButton.backgroundColor = [UIColor colorWithHexString:@"ff6440"];
+    _sureButton.layer.cornerRadius = 25;
+    self.view.backgroundColor = [UIColor groupTableViewBackgroundColor];
+    [_sureButton addTarget:self action:@selector(sureButtonClick) forControlEvents:UIControlEventTouchUpInside];
+    _textView.placeholder = @"  宝宝为什么请假呢？";
+    _textView.placeholderColor = [UIColor lightGrayColor];
+    _tableView.tableFooterView = [UIView new];
+    _tableView.backgroundColor = [UIColor groupTableViewBackgroundColor];
+    _leftAry = [NSMutableArray arrayWithArray:@[@"请假宝宝", @"请假学校", @"申请人", @"请假开始时间", @"请假结束时间"]];
+    NSString *gxname = [NSString stringWithFormat:@"%@%@", TheCurBaoBao.realname, [NSString relationshipWithID:TheCurBaoBao.gxid gxname:TheCurBaoBao.gxname]];
+    _rightAry = [NSMutableArray arrayWithArray:@[@"", @"请假学校可多选", gxname, @"", @""]];
+    _datePicker = [[[NSBundle mainBundle] loadNibNamed:@"DatePicker" owner:self options:nil] firstObject];
+    _datePicker.dpType = BBQDatePickerTypeCreateLeave;
+    _schoolModelAry = [NSMutableArray arrayWithCapacity:0];
+}
+
+- (void)sureButtonClick {
+    [_textView endEditing:YES];
+    if (_textView.text.length == 0) {
+        [SVProgressHUD showInfoWithStatus:@"请假内容不能为空"];
+        return;
+    }
+    if (!_selectModel) {
+        [SVProgressHUD showInfoWithStatus:@"请选择要请假的宝宝"];
+        return;
+    }
+    if (_schoolModelAry.count == 0) {
+        [SVProgressHUD showInfoWithStatus:@"请选择要请假的学校"];
+        return;
+    }
+    if (_startTime.length == 0 ) {
+        [SVProgressHUD showInfoWithStatus:@"请选择请假开始时间"];
+        return;
+    }
+    if (_endTime.length == 0) {
+        [SVProgressHUD showInfoWithStatus:@"请选择请假结束时间"];
+        return;
+    }
+    NSComparisonResult result = [_endTime compare:_startTime];
+    if (result != NSOrderedDescending) {
+        [SVProgressHUD showErrorWithStatus:@"请假结束时间必须大于请假开始时间"];
+        return;
+    }
+    
+    [SVProgressHUD showWithStatus:@"请稍候"];
+    NSMutableArray *sary = [NSMutableArray arrayWithCapacity:0];
+    for (BBQSchoolDataModel *schoolDataModel in _selectModel.baobaoschooldata) {
+        // schoolModelAry里存的是schoolid 通过这个schoolid找到schoolDataModel
+        for (NSNumber *schoolid in _schoolModelAry) {
+            if (schoolDataModel.schoolid.intValue == schoolid.intValue) {
+                [sary addObject:schoolDataModel];
+            }
+        }
+    }
+    NSMutableArray *schoolAry = [NSMutableArray arrayWithCapacity:0];
+    for (BBQSchoolDataModel *model in sary) {
+        // 通过schoolDataModel找到班级
+        NSMutableArray *classAry = [NSMutableArray arrayWithCapacity:0];
+        for (BBQClassDataModel *classModel in model.classdata) {
+            [classAry addObject:classModel.classid];
+        }
+        NSDictionary *dic = @{
+                              @"schoolid" : model.schoolid,
+                              @"classuid" : classAry
+                              };
+        [schoolAry addObject:dic];
+    }
+    NSDictionary *dicData = @{
+                              @"baobaouid" : _selectModel.uid,
+                              @"school" : schoolAry,
+                              @"dotime_s" : _startTime,
+                              @"dotime_e" : _endTime,
+                              @"content" : _textView.text
+                              };
+    
+    BBQCreateLeaveApi *api = [[BBQCreateLeaveApi alloc] initWithDic:dicData];
+    [api startWithCompletionBlockWithSuccess:^(YTKBaseRequest *request) {
+        if ([request.responseJSONObject[@"res"] intValue] == 1) {
+            
+            if (self.block) {
+                self.block();
+                [self.navigationController popViewControllerAnimated:YES];
+            }
+        } else {
+            [SVProgressHUD showInfoWithStatus:request.responseJSONObject[@"msg"]];
+        }
+    } failure:^(YTKBaseRequest *request) {
+        [SVProgressHUD showInfoWithStatus:request.responseJSONObject[@"msg"]];
+    }];
+}
+
+- (void)didReceiveMemoryWarning {
+    [super didReceiveMemoryWarning];
+    // Dispose of any resources that can be recreated.
+}
+
+- (void)scrollViewDidScroll:(UIScrollView *)scrollView {
+    [_textView endEditing:YES];
+}
+
+- (void)textViewDidBeginEditing:(UITextView *)textView {
+    [self removeDatePickerView];
+}
+
+- (NSInteger)numberOfSectionsInTableView:(UITableView *)tableView {
+    return 1;
+}
+
+- (NSInteger)tableView:(UITableView *)tableView numberOfRowsInSection:(NSInteger)section {
+    return 5;
+}
+
+- (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
+    BBQCreateLeaveCell *cell = [tableView dequeueReusableCellWithIdentifier:@"createLeaveCell" forIndexPath:indexPath];
+    cell.leftLabel.text = _leftAry[indexPath.row];
+    cell.rightLabel.text = _rightAry[indexPath.row];
+    if ([cell.rightLabel.text isEqualToString:@"请假学校可多选"]) {
+        cell.rightLabel.textColor = [UIColor lightGrayColor];
+    } else {
+        cell.rightLabel.textColor = [UIColor blackColor];
+    }
+    if (indexPath.row == 2) {
+        cell.accessoryType = UITableViewCellAccessoryNone;
+    }
+    return cell;
+}
+
+- (void)tableView:(UITableView *)tableView didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
+    [_textView endEditing:YES];
+    [self removeDatePickerView];
+    if (indexPath.row == 0) {
+        [self setMyOverlayView];
+    } else if (indexPath.row == 1) {
+        [self setupSchoolOverlayView];
+    } else if (indexPath.row == 3) {
+        [self.view addSubview:_datePicker];
+        WS(weakSelf);
+        __weak typeof(NSMutableArray *) rightAry = _rightAry;
+        _datePicker.datePickerCallBack = ^(NSString *time) {
+            [rightAry replaceObjectAtIndex:3 withObject:[NSString stringWithFormat:@"%@时", [time substringToIndex:13]]];
+            _startTime = time;
+            [weakSelf.tableView reloadData];
+        };
+    } else if (indexPath.row == 4) {
+        [self.view addSubview:_datePicker];
+        WS(weakSelf);
+        _datePicker.datePickerCallBack = ^(NSString *time) {
+            NSComparisonResult result = [time compare:weakSelf.startTime];
+            if (result == NSOrderedDescending) {
+                [weakSelf.rightAry replaceObjectAtIndex:4 withObject:[NSString stringWithFormat:@"%@时", [time substringToIndex:13]]];
+                _endTime = time;
+                [weakSelf.tableView reloadData];
+            } else {
+                [SVProgressHUD showErrorWithStatus:@"结束时间必须大于开始时间"];
+            }
+            
+        };
+    }
+}
+
+- (void)setMyOverlayView {
+    _overlayView = [[UIView alloc] initWithFrame:self.view.window.frame];
+    _overlayView.alpha = 0.0f;
+    _overlayView.backgroundColor = [UIColor blackColor];
+    [self.view.window addSubview:_overlayView];
+    
+    UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tapEvent:)];
+    [_overlayView addGestureRecognizer:tap];
+    NSMutableArray *array = [NSMutableArray arrayWithArray:TheCurUser.baobaodata];
+    for (BBQBabyModel *baby in TheCurUser.baobaodata) {
+        if (!baby.curClass || !baby.curSchool) {
+            [array removeObject:baby];
+        }
+    }
+    _babyPicker = [[BBQBabyPickerViewController alloc] initWithSource:array];
+    _babyPicker.view.frame = CGRectZero;
+    _babyPicker.view.alpha = 0.0f;
+    WS(weakSelf);
+    _babyPicker.block = ^(BBQBabyModel *model) {
+        if ([weakSelf.selectModel.uid isEqualToNumber:model.uid]) {
+            [weakSelf tapEvent:nil];
+            return ;
+        }
+        weakSelf.selectModel = model;
+        [weakSelf.rightAry replaceObjectAtIndex:0 withObject:model.realname];
+        [weakSelf.rightAry replaceObjectAtIndex:1 withObject:@"请假学校可多选"];
+        [weakSelf.schoolModelAry removeAllObjects];
+        [weakSelf.tableView reloadData];
+        [weakSelf tapEvent:nil];
+    };
+    [self.view.window addSubview:_babyPicker.view];
+    
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [UIView animateWithDuration:0.3 animations:^{
+            _overlayView.alpha = 0.2;
+        }];
+        
+        CGFloat rowHeight = (44 * array.count > 176) ? 176 : 44 * array.count;
+        
+        [UIView animateWithDuration:0.3 delay:0 usingSpringWithDamping:0.7 initialSpringVelocity:1 options:UIViewAnimationOptionCurveEaseInOut animations:^{
+            _babyPicker.view.frame = CGRectMake(50, (kScreen_Height - rowHeight) / 2 , kScreen_Width - 100, rowHeight);
+            _babyPicker.view.alpha = 1;
+        } completion:nil];
+    });
+}
+
+- (void)setupSchoolOverlayView {
+    if (!_selectModel) {
+        [SVProgressHUD showInfoWithStatus:@"请先选择需要请假的宝宝"];
+        return;
+    }
+    BBQBabyModel *baobao = [TheCurUser babyWithUid:_selectModel.uid];
+    NSMutableArray *schoolAry = [NSMutableArray arrayWithCapacity:0];
+    for (BBQSchoolDataModel *schoolModel in baobao.baobaoschooldata) {
+        BBQBabyModel *baobaoData = [BBQBabyModel new];
+        baobaoData.realname = schoolModel.schoolname;
+        baobaoData.uid = schoolModel.schoolid;
+        [schoolAry addObject:baobaoData];
+    }
+    
+    
+    _overlayView = [[UIView alloc] initWithFrame:self.view.window.frame];
+    _overlayView.alpha = 0.0f;
+    _overlayView.backgroundColor = [UIColor blackColor];
+    [self.view.window addSubview:_overlayView];
+    
+    UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tapEvent:)];
+    [_overlayView addGestureRecognizer:tap];
+    _babyPicker = [[BBQBabyPickerViewController alloc] initWithSource:schoolAry];
+    _babyPicker.view.frame = CGRectZero;
+    _babyPicker.view.alpha = 0.0f;
+    WS(weakSelf);
+    _babyPicker.block = ^(BBQBabyModel *model) {
+        if (weakSelf.schoolModelAry.count == 0) {
+            [weakSelf.schoolModelAry addObject:model.uid];
+            [weakSelf.rightAry replaceObjectAtIndex:1 withObject:model.realname];
+            [weakSelf.tableView reloadData];
+            [weakSelf tapEvent:nil];
+        } else {
+            // 通过宝宝的id判断是否已选择
+            if (![weakSelf.schoolModelAry containsObject:model.uid]) {
+                [weakSelf.schoolModelAry addObject:model.uid];
+                NSString *string = [NSString stringWithFormat:@"%@、%@",[weakSelf.rightAry objectAtIndex:1], model.realname];
+                [weakSelf.rightAry replaceObjectAtIndex:1 withObject:string];
+                [weakSelf.tableView reloadData];
+                [weakSelf tapEvent:nil];
+            } else {
+                [SVProgressHUD showInfoWithStatus:@"这个学校已经选择了"];
+            }
+        }
+    };
+    [self.view.window addSubview:_babyPicker.view];
+    
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [UIView animateWithDuration:0.3 animations:^{
+            _overlayView.alpha = 0.2;
+        }];
+        
+        CGFloat rowHeight = (44 * schoolAry.count > 176) ? 176 : 44 * schoolAry.count;
+        
+        [UIView animateWithDuration:0.3 delay:0 usingSpringWithDamping:0.7 initialSpringVelocity:1 options:UIViewAnimationOptionCurveEaseInOut animations:^{
+            _babyPicker.view.frame = CGRectMake(50, (kScreen_Height - rowHeight) / 2 , kScreen_Width - 100, rowHeight);
+            _babyPicker.view.alpha = 1;
+        } completion:nil];
+    });
+}
+
+- (void)tapEvent:(UITapGestureRecognizer *)ges {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [UIView animateWithDuration:0.2 animations:^{
+            _babyPicker.view.frame = CGRectZero;
+            _overlayView.alpha = 0.0f;
+        }];
+    });
+}
+
+- (void)removeDatePickerView {
+    [UIView animateWithDuration:0.5
+                     animations:^{
+                         
+                         [_datePicker removeFromSuperview];
+                         
+                     }];
+}
+
+/*
+#pragma mark - Navigation
+
+// In a storyboard-based application, you will often want to do a little preparation before navigation
+- (void)prepareForSegue:(UIStoryboardSegue *)segue sender:(id)sender {
+    // Get the new view controller using [segue destinationViewController].
+    // Pass the selected object to the new view controller.
+}
+*/
+
+@end

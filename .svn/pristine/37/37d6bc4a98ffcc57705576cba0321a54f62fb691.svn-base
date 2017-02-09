@@ -1,0 +1,122 @@
+//
+//  HttpTool.m
+//  httpTool2
+//
+//  Created by apple on 15/3/5.
+//  Copyright (c) 2015年 baidu. All rights reserved.
+//
+
+#import "HttpTool.h"
+#import <AFNetworking.h>
+#import <SBJson4.h>
+
+@implementation HttpTool
+
++ (void)postWithPath:(NSString *)path
+              params:(NSDictionary *)params
+             success:(HttpSuccessBlock)success
+             failure:(HttpFailureBlock)failure {
+  SBJson4Writer *writer = [[SBJson4Writer alloc] init];
+  NSDictionary *dic = [NSDictionary
+      dictionaryWithObjectsAndKeys:[writer stringWithObject:params], @"para",
+                                   nil];
+
+  NSMutableURLRequest *request =
+      [NSMutableURLRequest requestWithURL:[NSURL URLWithString:path]];
+  request.HTTPMethod = @"POST";
+  request.timeoutInterval = REQUEST_TIMEOUT;
+  NSString *param = [NSString
+      stringWithFormat:@"para=%@", [JsonManager dictionaryToJson:params]];
+  request.HTTPBody = [param dataUsingEncoding:NSUTF8StringEncoding];
+  NSURLSession *session = [NSURLSession sharedSession];
+
+  AFHTTPRequestOperationManager *manager =
+      [AFHTTPRequestOperationManager manager];
+  manager.responseSerializer = [AFJSONResponseSerializer serializer];
+  manager.responseSerializer.acceptableContentTypes =
+      [NSSet setWithObjects:@"application/json", @"text/json",
+                            @"text/javascript", @"text/html", nil];
+  [manager POST:path
+      parameters:dic
+      success:^(AFHTTPRequestOperation *operation, id responseObject) {
+        NSLog(@"JSON: %@ %@ %@", responseObject,
+              [[NSString alloc] initWithData:operation.request.HTTPBody
+                                    encoding:NSUTF8StringEncoding],
+              [[NSString alloc] initWithData:request.HTTPBody
+                                    encoding:NSUTF8StringEncoding]);
+      }
+      failure:^(AFHTTPRequestOperation *operation, NSError *error) {
+        NSLog(@"anymuse error: %@", error);
+      }];
+
+  NSURLSessionDataTask *task =
+      [session dataTaskWithRequest:request
+                 completionHandler:^(NSData *data, NSURLResponse *response,
+                                     NSError *error) {
+                   if (!error) {
+                     NSDictionary *dic =
+                         [NSJSONSerialization JSONObjectWithData:data
+                                                         options:0
+                                                           error:nil];
+                     success(dic);
+
+                   } else {
+                     failure(error);
+                   }
+                 }];
+  [task resume];
+}
+
++ (void)getWithPath:(NSString *)path
+             params:(NSDictionary *)params
+            success:(HttpSuccessBlock)success
+            failure:(HttpFailureBlock)failure {
+  AFHTTPRequestOperationManager *manager =
+      [AFHTTPRequestOperationManager manager];
+  [manager setResponseSerializer:[AFHTTPResponseSerializer serializer]];
+  [manager GET:path
+      parameters:params
+      success:^(AFHTTPRequestOperation *operation, id responseObject) {
+        NSDictionary *dic =
+            [NSJSONSerialization JSONObjectWithData:responseObject
+                                            options:0
+                                              error:nil];
+        success(dic);
+      }
+      failure:^(AFHTTPRequestOperation *operation, NSError *error){
+
+      }];
+}
+
++ (void)multipartPostFileDataWithPath:(NSString *)path
+                               params:(NSDictionary *)params
+                              dataAry:(NSArray *)dataAry
+                              success:(HttpSuccessBlock)success
+                              failure:(HttpFailureBlock)failure {
+  AFHTTPRequestOperationManager *manager =
+      [AFHTTPRequestOperationManager manager];
+  [manager setResponseSerializer:[AFHTTPResponseSerializer serializer]];
+
+  [manager POST:path
+      parameters:params
+      constructingBodyWithBlock:^(id<AFMultipartFormData> formData) {
+        for (UploadFileModel *uploadModel in dataAry) {
+          [formData appendPartWithFileData:uploadModel.fileData
+                                      name:@"avartar"
+                                  fileName:uploadModel.fileName
+                                  mimeType:@"image/jpg"];
+        }
+      }
+      success:^(AFHTTPRequestOperation *operation, id responseObject) {
+        NSDictionary *dic =
+            [NSJSONSerialization JSONObjectWithData:responseObject
+                                            options:0
+                                              error:nil];
+        success(dic);
+      }
+      failure:^(AFHTTPRequestOperation *operation, NSError *error) {
+        failure(error);
+      }];
+}
+
+@end

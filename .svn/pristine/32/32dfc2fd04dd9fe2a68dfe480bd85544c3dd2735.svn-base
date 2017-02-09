@@ -1,0 +1,286 @@
+//
+//  BBQTableViewController
+//  BBQTableViewController
+//
+//  Created by Shiki on 10/24/13.
+//  Copyright (c) 2013 Shiki. All rights reserved.
+//
+
+#import "BBQTableViewController.h"
+#import "SVPullToRefresh.h"
+#import "BBQBaseTableView.h"
+#import "BBQLoadingView.h"
+#import "BBQEmptyView.h"
+#import "BBQErrorView.h"
+#import <Masonry.h>
+
+@interface BBQTableViewController ()
+
+@property(readwrite, strong, nonatomic) UIView *statefulView;
+@property (strong, nonatomic) ODRefreshControl *refresh;
+@property (assign, nonatomic) BOOL loadMoreViewIsErrorView;
+
+@end
+
+@implementation BBQTableViewController
+
+- (id)initWithCoder:(NSCoder *)aDecoder {
+    if ((self = [super initWithCoder:aDecoder])) {
+        [self onInit];
+    }
+    return self;
+}
+
+- (id)initWithNibName:(NSString *)nibNameOrNil
+               bundle:(NSBundle *)nibBundleOrNil {
+    if ((self = [super initWithNibName:nibNameOrNil bundle:nibBundleOrNil])) {
+        [self onInit];
+    }
+    return self;
+}
+
+- (void)onInit {
+    self.canLoadMore = YES;
+    self.canPullToRefresh = YES;
+    self.needLoadMore = YES;
+    self.needPullToRefresh = YES;
+}
+
+#pragma mark - Life Cycle
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    self.edgesForExtendedLayout = UIRectEdgeNone;
+    
+    @weakify(self)
+    [self bk_addObserverForKeyPath:@"statefulState" options:NSKeyValueObservingOptionNew task:^(id obj, NSDictionary *change) {
+        @strongify(self)
+        BBQTableViewControllerState state = [change[@"new"] unsignedIntegerValue];
+        if (state == BBQTableViewControllerStateLoadingFromPullToRefresh || state == BBQTableViewControllerStateLoadingMore) {
+            return;
+        }
+        UIView *view;
+        switch (state) {
+            case BBQTableViewControllerStateIdle: {
+                break;
+            }
+            case BBQTableViewControllerStateInitialLoading: {
+                view = [self viewForInitialLoad];
+                break;
+            }
+            case BBQTableViewControllerStateEmpty: {
+                view = [self viewForEmpty];
+                break;
+            }
+            case BBQTableViewControllerStateInitialLoadError: {
+                view = [self viewForEmptyInitialLoadError];
+                ((BBQErrorView *)view).reloadBlock = ^{
+                    @strongify(self)
+                    [self triggerInitialLoad];
+                };
+                break;
+            }
+            case BBQTableViewControllerStateLoadingFromPullToRefresh:
+            case BBQTableViewControllerStateLoadingMore: {
+                break;
+            }
+        }
+        [self resetStatefulView:view];
+    }];
+    
+    self.tableView.tableFooterView = [UIView new];
+    if (self.needLoadMore) {
+        @weakify(self)
+        [self.tableView addInfiniteScrollingWithActionHandler:^{
+            @strongify(self)
+            [self triggerLoadMore];
+        }];
+        //        self.tableView.infiniteScrollingView.enabled = NO;
+    }
+    
+    if (self.needPullToRefresh) {
+        self.refresh = [[ODRefreshControl alloc] initInScrollView:self.tableView];
+        [self.refresh addTarget:self action:@selector(triggerPullToRefresh) forControlEvents:UIControlEventValueChanged];
+    }
+}
+
+#pragma mark - Initial Load
+- (BOOL)triggerInitialLoad {
+    if ([self stateIsLoading])
+        return NO;
+    
+    self.statefulState = BBQTableViewControllerStateInitialLoading;
+    
+    if ([self.statefulDelegate
+         respondsToSelector:
+         @selector(tableViewControllerWillBeginInitialLoad:
+                   completion:)]) {
+             @weakify(self)
+             [self.statefulDelegate
+              tableViewControllerWillBeginInitialLoad:
+              self completion:^(BOOL tableIsEmpty, BOOL hasError) {
+                  @strongify(self)
+                  [self setHasFinishedInitialLoad:tableIsEmpty hasError:hasError];
+              }];
+         }
+    return YES;
+}
+
+- (void)setHasFinishedInitialLoad:(BOOL)tableIsEmpty
+                         hasError:(BOOL)hasError {
+    if (self.statefulState != BBQTableViewControllerStateInitialLoading) {
+        return;
+    }
+    
+    if (hasError) {
+        self.statefulState = BBQTableViewControllerStateInitialLoadError;
+    } else if (tableIsEmpty) {
+        self.statefulState = BBQTableViewControllerStateEmpty;
+    } else {
+        self.statefulState = BBQTableViewControllerStateIdle;
+    }
+}
+
+- (UIView *)viewForInitialLoad {
+    if ([self.statefulDelegate
+         respondsToSelector:
+         @selector(tableViewControllerViewForInitialLoad:)]) {
+        return [self.statefulDelegate
+                tableViewControllerViewForInitialLoad:self];
+    }
+    BBQLoadingView *view = [[NSBundle mainBundle] loadNibNamed:@"BBQLoadingView" owner:nil options:nil].firstObject;
+    return view;
+}
+
+- (UIView *)viewForEmpty {
+    BBQEmptyView *view = [[NSBundle mainBundle] loadNibNamed:@"BBQEmptyView" owner:nil options:nil].firstObject;
+    return view;
+}
+
+- (UIView *)viewForEmptyInitialLoadError {
+    BBQErrorView *view = [[NSBundle mainBundle] loadNibNamed:@"BBQErrorView" owner:nil options:nil].firstObject;
+    return view;
+    
+}
+
+#pragma mark - Pull To Refresh
+- (BOOL)triggerPullToRefresh {
+    if ([self stateIsLoading])
+        return NO;
+    self.statefulState = BBQTableViewControllerStateLoadingFromPullToRefresh;
+    
+    if ([self.statefulDelegate
+         respondsToSelector:
+         @selector(
+                   tableViewControllerWillBeginLoadingFromPullToRefresh:
+                   completion:
+                   )]) {
+             @weakify(self)
+             [self.statefulDelegate
+              tableViewControllerWillBeginLoadingFromPullToRefresh:
+              self completion:^(BOOL tableIsEmpty, BOOL hasError) {
+                  @strongify(self)
+                  [self setHasFinishedLoadingFromPullToRefresh:tableIsEmpty
+                                                      hasError:hasError];
+              }];
+         }
+    
+    [self.refresh beginRefreshing];
+    return YES;
+}
+
+- (void)setHasFinishedLoadingFromPullToRefresh:(BOOL)tableIsEmpty
+                                      hasError:(BOOL)hasError {
+    if (self.statefulState !=
+        BBQTableViewControllerStateLoadingFromPullToRefresh)
+        return;
+    [self.refresh endRefreshing];
+    if (tableIsEmpty) {
+        self.statefulState = BBQTableViewControllerStateEmpty;
+    } else {
+        self.statefulState = BBQTableViewControllerStateIdle;
+    }
+}
+#pragma mark - Load More
+- (void)triggerLoadMore {
+    if ([self stateIsLoading])
+        return;
+    
+    self.loadMoreViewIsErrorView = NO;
+    
+    self.statefulState = BBQTableViewControllerStateLoadingMore;
+    
+    @weakify(self)
+    if ([self.statefulDelegate
+         respondsToSelector:
+         @selector(tableViewControllerWillBeginLoadingMore:
+                   completion:)]) {
+             [self.statefulDelegate
+              tableViewControllerWillBeginLoadingMore:
+              self completion:^(BOOL canLoadMore, BOOL hasError,
+                                BOOL showErrorView) {
+                  @strongify(self)
+                  [self setHasFinishedLoadingMore:canLoadMore
+                                         hasError:hasError
+                                    showErrorView:showErrorView];
+              }];
+         }
+}
+
+- (void)setHasFinishedLoadingMore:(BOOL)canLoadMore
+                         hasError:(BOOL)hasError
+                    showErrorView:(BOOL)showErrorView {
+    if (self.statefulState != BBQTableViewControllerStateLoadingMore)
+        return;
+    [self.tableView.infiniteScrollingView stopAnimating];
+    if (hasError) {
+        [self.tableView.infiniteScrollingView showErrorView];
+    } else if (!canLoadMore) {
+        [self.tableView.infiniteScrollingView showNoMoreView];
+    }
+    
+    self.canLoadMore = canLoadMore;
+    self.loadMoreViewIsErrorView = hasError && showErrorView;
+    
+    self.statefulState = BBQTableViewControllerStateIdle;
+}
+
+#pragma mark - Utils
+- (void)resetStatefulView:(UIView *)view {
+    [_statefulView removeFromSuperview];
+    if (view) {
+        _statefulView = view;
+        [self.view addSubview:_statefulView];
+        [_statefulView mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.edges.equalTo(self.view);
+        }];
+    }
+}
+
+- (BOOL)stateIsLoading {
+    return self.statefulState ==
+    BBQTableViewControllerStateInitialLoading ||
+    self.statefulState ==
+    BBQTableViewControllerStateLoadingFromPullToRefresh ||
+    self.statefulState == BBQTableViewControllerStateLoadingMore;
+}
+
+#pragma mark - Getter & Setter
+- (void)setCanLoadMore:(BOOL)canLoadMore {
+    _canLoadMore = canLoadMore;
+    if (self.needLoadMore) {
+        _tableView.showsInfiniteScrolling = canLoadMore;
+    }
+}
+
+- (UITableView *)tableView {
+    if (!_tableView) {
+        _tableView = [[UITableView alloc] initWithFrame:self.view.bounds style:UITableViewStylePlain];
+        [self.view addSubview:_tableView];
+        [_tableView mas_makeConstraints:^(MASConstraintMaker *make) {
+            make.edges.equalTo(self.view);
+        }];
+    }
+    return _tableView;
+}
+
+@end

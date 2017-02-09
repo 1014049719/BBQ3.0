@@ -1,0 +1,313 @@
+//
+//  ResetUserDataTableViewController.m
+//  BBQ
+//
+//  Created by wth on 15/8/11.
+//  Copyright (c) 2015年 bbq. All rights reserved.
+//
+
+#import "ResetUserDataTableViewController.h"
+#import "BBQBabyModifyViewController.h"
+#import "BBQAttentionViewController.h"
+#import "UIButton+Extension.h"
+#import "BBQAttentionViewController.h"
+#import "UIBarButtonItem+Extention.h"
+
+@interface ResetUserDataTableViewController () <UIActionSheetDelegate,
+                                                UIImagePickerControllerDelegate,
+                                                UINavigationControllerDelegate>
+
+//相册
+@property(strong, nonatomic) UIImagePickerController *imagePicker;
+//图片转换的data对象
+@property(strong, nonatomic) NSData *data;
+//图片二进制路径
+@property(strong, nonatomic) NSString *filePathStr;
+
+@property(strong, nonatomic) NSMutableArray *imageAry;
+@property(strong, nonatomic) UploadFileModel *uploadFileModel;
+
+@end
+
+@implementation ResetUserDataTableViewController
+
+- (void)viewDidLoad {
+  [super viewDidLoad];
+  [self initValues];
+
+  self.tableView.tableFooterView = [UIView new];
+
+  //相册
+  _imagePicker = [[UIImagePickerController alloc] init];
+  _imagePicker.allowsEditing = YES;
+  //要同时包含<UIImagePickerControllerDelegate,UINavigationControllerDelegate>
+  _imagePicker.delegate = self;
+    [self.headerBtn buttonDispNetorLocalImg:TheCurUser.member.avartar];
+  self.nameTextField.text = TheCurUser.member.realname;
+
+  UITapGestureRecognizer *tap =
+      [[UITapGestureRecognizer alloc] initWithTarget:self
+                                              action:@selector(tapEvent)];
+  [self.view addGestureRecognizer:tap];
+    
+    self.navigationItem.leftBarButtonItem = [UIBarButtonItem itemWithtTarget:self anction:@selector(back) image:@"nav_back_arrow" title:nil];
+}
+
+-(void)back{
+    if (self.resetType == BBQResetUserDataTypeRegist) {
+        UIStoryboard *sb = [UIStoryboard storyboardWithName:@"RootTabBar" bundle:nil];
+        BBQAttentionViewController *vc = [sb instantiateViewControllerWithIdentifier:@"AttentionListBoard"];
+        vc.type = BBQAttentionViewTypeLogin;
+        [self.navigationController pushViewController:vc animated:YES];
+    }else{
+        [self.navigationController popViewControllerAnimated:YES];
+    }
+}
+
+- (void)initValues {
+
+  if (self.imageAry == nil) {
+    self.imageAry = [NSMutableArray arrayWithCapacity:0];
+  }
+  if (self.uploadFileModel == nil) {
+    self.uploadFileModel = [[UploadFileModel alloc] init];
+  }
+}
+
+//上传头像
+- (IBAction)uploadHead:(id)sender {
+
+  //创建UIActionSheet
+  UIActionSheet *actionSheet =
+      [[UIActionSheet alloc] initWithTitle:@"选择照片"
+                                  delegate:self
+                         cancelButtonTitle:@"取消"
+                    destructiveButtonTitle:@"来自相册"
+                         otherButtonTitles:@"拍照", nil];
+  [actionSheet showInView:self.view];
+}
+// UIActionSheet选择事件
+- (void)actionSheet:(UIActionSheet *)actionSheet
+    clickedButtonAtIndex:(NSInteger)buttonIndex {
+
+  switch (buttonIndex) {
+  case 0: {
+    _imagePicker.sourceType = UIImagePickerControllerSourceTypePhotoLibrary;
+    //跳转到相册
+    [self presentViewController:_imagePicker animated:YES completion:nil];
+    //            self.navigationController.navigationBar.barStyle=UIBarStyleBlack;
+    NSLog(@"点击相册0");
+  } break;
+  case 1: {
+    _imagePicker.sourceType = UIImagePickerControllerSourceTypeCamera;
+    [self presentViewController:_imagePicker animated:YES completion:nil];
+    NSLog(@"点击相机1");
+  } break;
+  default:
+    break;
+  }
+}
+
+// imagePickerView代理 照片选择完成
+/*
+-(void)imagePickerController:(UIImagePickerController *)picker
+didFinishPickingMediaWithInfo:(NSDictionary *)info{
+
+    UIImage *image=info[UIImagePickerControllerOriginalImage];
+
+    NSData *data2=UIImagePNGRepresentation(image);
+    _data=data2;
+
+    //刚换按钮图片
+    [self.headerBtn setBackgroundImage:image forState:UIControlStateNormal];
+    self.headerBtn.layer.cornerRadius=45;
+    self.headerBtn.layer.masksToBounds=YES;
+
+    //这里将图片放在沙盒的documents文件夹中
+    NSString *DocumentsPathStr=[NSHomeDirectory()
+stringByAppendingPathComponent:@"Documents"];
+    //文件管理器
+    NSFileManager *fileManager=[NSFileManager defaultManager];
+    //把刚刚图片转换的data对象拷贝至沙盒中 并保存为image.png
+    [fileManager createDirectoryAtPath:DocumentsPathStr
+withIntermediateDirectories:YES attributes:nil error:nil];
+    [fileManager createFileAtPath:[DocumentsPathStr
+stringByAppendingString:@"/image.png"] contents:_data attributes:nil];
+
+    //得到选择后沙盒中图片的完整路径
+    _filePathStr=[NSString
+stringWithFormat:@"%@%@",DocumentsPathStr,@"/image.png"];
+
+    NSLog(@"图片的沙盒路径%@",_filePathStr);
+
+    if (![_filePathStr isEqualToString:@""]) {
+        //保存后 上传图片请求
+        [self UploadHeadIconWithUrlStr:[CS_URL_BASE
+stringByAppendingString:URL_UPLOAD_AVATAR]];
+
+        NSLog(@"开始上传头像请求");
+    }
+
+    //完成后返回界面
+    [self dismissViewControllerAnimated:YES completion:nil];
+
+}
+*/
+
+// imagePickerView代理 照片选择完成
+- (void)imagePickerController:(UIImagePickerController *)picker
+didFinishPickingMediaWithInfo:(NSDictionary *)info {
+
+  UIImage *image = info[UIImagePickerControllerOriginalImage];
+
+  NSString *filenameGuid = [NSString stringWithUUID];
+  NSDictionary *dicFileInfo =
+      [CommonFunc saveJYEXPic:image fileguid:filenameGuid mode:@"L"];
+
+  if (!dicFileInfo) {
+    [SVProgressHUD showErrorWithStatus:@"保存文件失败"];
+    return;
+  }
+
+  NSString *filepath = dicFileInfo[@"slt"][@"filepath"];
+  UIImage *imagefile = [UIImage imageWithContentsOfFile:filepath];
+
+  self.uploadFileModel.fileData = UIImageJPEGRepresentation(imagefile, 1);
+  self.uploadFileModel.fileName = filepath;
+  [self.imageAry addObject:self.uploadFileModel];
+
+  //刚换按钮图片
+  [self.headerBtn setBackgroundImage:imagefile forState:UIControlStateNormal];
+  self.headerBtn.layer.cornerRadius = 45;
+  self.headerBtn.layer.masksToBounds = YES;
+
+  NSLog(@"开始上传头像请求");
+
+  //保存后 上传图片请求
+  [self
+      UploadHeadIconWithUrlStr:[CS_URL_BASE
+                                   stringByAppendingString:URL_UPLOAD_AVATAR]];
+
+  //完成后返回界面
+  [self dismissViewControllerAnimated:YES completion:nil];
+}
+
+// imagePickerView代理 照片选择取消
+- (void)imagePickerControllerDidCancel:(UIImagePickerController *)picker {
+
+  //恢复状态栏
+  [[UIApplication sharedApplication] setStatusBarHidden:NO];
+
+  //取消后返回界面
+  [self dismissViewControllerAnimated:NO completion:nil];
+}
+
+#pragma mark 上传头像请求
+- (void)UploadHeadIconWithUrlStr:(NSString *)UrlStr {
+
+  [SVProgressHUD showWithStatus:@"请稍候..."];
+  //上传参数
+
+  NSDictionary *paramsDic = @{ @"uid" : TheCurUser.member.uid };
+
+  [HttpTool multipartPostFileDataWithPath:UrlStr
+      params:paramsDic
+      dataAry:self.imageAry
+      success:^(id JSON) {
+        dispatch_async(
+            dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+              NSDictionary *dic = JSON;
+              NSInteger res = [dic[@"res"] integerValue];
+              if (res == 1) {
+                dispatch_async(dispatch_get_main_queue(), ^{
+                  [SVProgressHUD showSuccessWithStatus:@"上传成功"];
+                  //修改头像文件名
+                  TheCurUser.member.avartar = self.uploadFileModel.fileName;
+                  //增加刷新数
+                  
+                });
+
+              } else {
+                dispatch_async(dispatch_get_main_queue(), ^{
+                  NSString *message =
+                      [NSString stringWithFormat:@"%@", dic[@"msg"]];
+                  [SVProgressHUD showErrorWithStatus:message];
+                });
+              }
+            });
+
+      }
+      failure:^(NSError *error) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+          [SVProgressHUD showErrorWithStatus:[error localizedDescription]];
+        });
+      }];
+}
+
+- (void)tapEvent {
+  [self.nameTextField endEditing:YES];
+  [self.nameTextField resignFirstResponder];
+}
+
+- (void)didReceiveMemoryWarning {
+  [super didReceiveMemoryWarning];
+  // Dispose of any resources that can be recreated.
+}
+
+- (IBAction)sureBtnEvent:(UIButton *)sender {
+  if (self.nameTextField.text.length == 0) {
+    [CommonFunc showAlertView:@"请填写名字"];
+  } else if (self.nameTextField.text.length > 20) {
+    [CommonFunc showAlertView:@"请不要超过20个字"];
+  } else {
+    [self updateNameRequest];
+  }
+}
+
+- (void)updateNameRequest {
+
+  NSDictionary *params = @{
+    @"realname" : self.nameTextField.text,
+    @"birthday" : @"",
+    @"gender" : @0,
+    @"baobaouid" : @"",
+    @"gx" : @"",
+    @"nickname" : self.nameTextField.text
+  };
+  [BBQHTTPRequest
+       queryWithType:BBQHTTPRequestTypeModifyInfo
+               param:params
+      successHandler:^(AFHTTPRequestOperation *operation,
+                       NSDictionary *responseObject, bool apiSuccess) {
+        NSString *message = @"修改成功";
+        [SVProgressHUD showSuccessWithStatus:message];
+        dispatch_after(
+            dispatch_time(DISPATCH_TIME_NOW,
+                          (int64_t)(HUD_DURATION(message) * NSEC_PER_SEC)),
+            dispatch_get_main_queue(), ^{
+              TheCurUser.member.realname = self.nameTextField.text;
+              TheCurUser.member.nickname = self.nameTextField.text;
+              //增加刷新数
+              
+                
+                if (_resetType == BBQResetUserDataTypeLogin) {
+                    UIStoryboard *storyBoard =
+                    [UIStoryboard storyboardWithName:@"RootTabBar" bundle:nil];
+                    BBQBabyModifyViewController *vc = [storyBoard
+                                                       instantiateViewControllerWithIdentifier:@"babyModifyVC"];
+                    vc.type = BBQBabyModifyTypeLogin;
+                    [self.navigationController pushViewController:vc animated:YES];
+                } else if (_resetType == BBQResetUserDataTypeRegist) {
+                    UIStoryboard *sb = [UIStoryboard storyboardWithName:@"RootTabBar" bundle:nil];
+                    BBQAttentionViewController *vc = [sb instantiateViewControllerWithIdentifier:@"AttentionListBoard"];
+                    vc.type = BBQAttentionViewTypeLogin;
+                    [self.navigationController pushViewController:vc animated:YES];
+                } else {
+                    [self.navigationController popViewControllerAnimated:YES];
+                }
+            });
+      } errorHandler:nil
+      failureHandler:nil];
+}
+
+@end

@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>IDESourceControlProjectFavoriteDictionaryKey</key>
+	<false/>
+	<key>IDESourceControlProjectIdentifier</key>
+	<string>F13BE3B5-8181-43B6-A05E-19E58F2459CE</string>
+	<key>IDESourceControlProjectName</key>
+	<string>BBQ</string>
+	<key>IDESourceControlProjectOriginsDictionary</key>
+	<dict>
+		<key>890404e3-8f66-a746-86dc-087c1abfef6e++5943</key>
+		<string>https://171.111.153.138:8443/svn/bbq/01code/ios/code/BBQ</string>
+	</dict>
+	<key>IDESourceControlProjectPath</key>
+	<string>BBQ.xcworkspace</string>
+	<key>IDESourceControlProjectRelativeInstallPathDictionary</key>
+	<dict>
+		<key>890404e3-8f66-a746-86dc-087c1abfef6e++5943</key>
+		<string>..</string>
+	</dict>
+	<key>IDESourceControlProjectRepositoryRootDictionary</key>
+	<dict>
+		<key>890404e3-8f66-a746-86dc-087c1abfef6e++5943</key>
+		<string>https://171.111.153.138:8443/svn/bbq</string>
+	</dict>
+	<key>IDESourceControlProjectURL</key>
+	<string>https://171.111.153.138:8443/svn/bbq/01code/ios/code/BBQ/BBQ.xcworkspace</string>
+	<key>IDESourceControlProjectVersion</key>
+	<integer>111</integer>
+	<key>IDESourceControlProjectWCCIdentifier</key>
+	<string>890404e3-8f66-a746-86dc-087c1abfef6e++5943</string>
+	<key>IDESourceControlProjectWCConfigurations</key>
+	<array>
+		<dict>
+			<key>IDESourceControlRepositoryExtensionIdentifierKey</key>
+			<string>public.vcs.subversion</string>
+			<key>IDESourceControlWCCIdentifierKey</key>
+			<string>890404e3-8f66-a746-86dc-087c1abfef6e++5943</string>
+			<key>IDESourceControlWCCName</key>
+			<string>NewBBQ</string>
+		</dict>
+	</array>
+</dict>
+</plist>

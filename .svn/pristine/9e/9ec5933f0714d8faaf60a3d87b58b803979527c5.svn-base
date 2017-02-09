@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.XIB" version="3.0" toolsVersion="9059" systemVersion="14F27" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES">
+    <dependencies>
+        <deployment identifier="iOS"/>
+        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="9049"/>
+        <capability name="Aspect ratio constraints" minToolsVersion="5.1"/>
+    </dependencies>
+    <objects>
+        <placeholder placeholderIdentifier="IBFilesOwner" id="-1" userLabel="File's Owner"/>
+        <placeholder placeholderIdentifier="IBFirstResponder" id="-2" customClass="UIResponder"/>
+        <view contentMode="scaleToFill" id="81c-lu-hCx" customClass="CityPicker">
+            <rect key="frame" x="0.0" y="0.0" width="378" height="185"/>
+            <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+            <subviews>
+                <pickerView contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="5fb-Px-5Qp">
+                    <rect key="frame" x="0.0" y="45" width="378" height="140"/>
+                    <color key="backgroundColor" white="1" alpha="1" colorSpace="calibratedWhite"/>
+                    <constraints>
+                        <constraint firstAttribute="width" secondItem="5fb-Px-5Qp" secondAttribute="height" multiplier="27:10" id="ReR-HF-4az"/>
+                    </constraints>
+                </pickerView>
+                <button opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="roundedRect" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="7CV-5q-3YK">
+                    <rect key="frame" x="315" y="5" width="55" height="30"/>
+                    <color key="backgroundColor" red="0.94117647059999998" green="0.4549019608" blue="0.30980392159999998" alpha="1" colorSpace="deviceRGB"/>
+                    <constraints>
+                        <constraint firstAttribute="width" secondItem="7CV-5q-3YK" secondAttribute="height" multiplier="5:3" constant="5" id="3Vg-P9-7iH"/>
+                        <constraint firstAttribute="width" constant="55" id="gLQ-SK-fBN"/>
+                    </constraints>
+                    <state key="normal" title="确定">
+                        <color key="titleColor" white="1" alpha="1" colorSpace="calibratedWhite"/>
+                        <color key="titleShadowColor" white="0.5" alpha="1" colorSpace="calibratedWhite"/>
+                    </state>
+                    <userDefinedRuntimeAttributes>
+                        <userDefinedRuntimeAttribute type="number" keyPath="layer.cornerRadius">
+                            <integer key="value" value="15"/>
+                        </userDefinedRuntimeAttribute>
+                        <userDefinedRuntimeAttribute type="boolean" keyPath="layer.masksToBounds" value="YES"/>
+                    </userDefinedRuntimeAttributes>
+                    <connections>
+                        <action selector="sureBtnEvent:" destination="81c-lu-hCx" eventType="touchUpInside" id="dFa-lA-V26"/>
+                    </connections>
+                </button>
+                <button opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="roundedRect" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="tz1-Pc-Ygu">
+                    <rect key="frame" x="8" y="5" width="55" height="30"/>
+                    <color key="backgroundColor" red="0.94117647058823528" green="0.45490196078431372" blue="0.30980392156862746" alpha="1" colorSpace="deviceRGB"/>
+                    <constraints>
+                        <constraint firstAttribute="width" secondItem="tz1-Pc-Ygu" secondAttribute="height" multiplier="5:3" constant="5" id="9b7-9B-nDJ"/>
+                        <constraint firstAttribute="width" constant="55" id="iPh-rS-QGE"/>
+                    </constraints>
+                    <state key="normal" title="取消">
+                        <color key="titleColor" white="1" alpha="1" colorSpace="calibratedWhite"/>
+                        <color key="titleShadowColor" white="0.5" alpha="1" colorSpace="calibratedWhite"/>
+                    </state>
+                    <userDefinedRuntimeAttributes>
+                        <userDefinedRuntimeAttribute type="number" keyPath="layer.cornerRadius">
+                            <integer key="value" value="15"/>
+                        </userDefinedRuntimeAttribute>
+                        <userDefinedRuntimeAttribute type="boolean" keyPath="layer.masksToBounds" value="YES"/>
+                    </userDefinedRuntimeAttributes>
+                    <connections>
+                        <action selector="cancelBtnEvent:" destination="81c-lu-hCx" eventType="touchUpInside" id="sCe-O4-n3j"/>
+                    </connections>
+                </button>
+            </subviews>
+            <color key="backgroundColor" white="0.66666666666666663" alpha="1" colorSpace="calibratedWhite"/>
+            <constraints>
+                <constraint firstItem="5fb-Px-5Qp" firstAttribute="leading" secondItem="81c-lu-hCx" secondAttribute="leading" id="2h4-Lk-wTB"/>
+                <constraint firstAttribute="bottom" secondItem="5fb-Px-5Qp" secondAttribute="bottom" id="482-p6-KdW"/>
+                <constraint firstAttribute="bottom" secondItem="5fb-Px-5Qp" secondAttribute="bottom" id="MkO-vG-fnZ"/>
+                <constraint firstItem="5fb-Px-5Qp" firstAttribute="leading" secondItem="81c-lu-hCx" secondAttribute="leading" id="Mtd-7m-nKB"/>
+                <constraint firstItem="tz1-Pc-Ygu" firstAttribute="top" secondItem="81c-lu-hCx" secondAttribute="top" constant="5" id="Nvs-xK-Z3M"/>
+                <constraint firstAttribute="trailing" secondItem="5fb-Px-5Qp" secondAttribute="trailing" id="auu-fj-V1Y"/>
+                <constraint firstItem="tz1-Pc-Ygu" firstAttribute="leading" secondItem="81c-lu-hCx" secondAttribute="leading" constant="8" id="hoO-CC-5GW"/>
+                <constraint firstAttribute="trailing" secondItem="5fb-Px-5Qp" secondAttribute="trailing" id="pgm-Qi-gGG"/>
+                <constraint firstAttribute="trailing" secondItem="7CV-5q-3YK" secondAttribute="trailing" constant="8" id="rFX-RQ-vKa"/>
+                <constraint firstAttribute="trailing" secondItem="5fb-Px-5Qp" secondAttribute="trailing" id="rqE-Wm-5Zz"/>
+                <constraint firstAttribute="bottom" secondItem="5fb-Px-5Qp" secondAttribute="bottom" id="tvR-j0-kFI"/>
+                <constraint firstItem="7CV-5q-3YK" firstAttribute="top" secondItem="81c-lu-hCx" secondAttribute="top" constant="5" id="xTc-uN-bXs"/>
+                <constraint firstItem="5fb-Px-5Qp" firstAttribute="leading" secondItem="81c-lu-hCx" secondAttribute="leading" id="xZ8-Zd-DDV"/>
+            </constraints>
+            <nil key="simulatedStatusBarMetrics"/>
+            <freeformSimulatedSizeMetrics key="simulatedDestinationMetrics"/>
+            <variation key="default">
+                <mask key="constraints">
+                    <exclude reference="2h4-Lk-wTB"/>
+                    <exclude reference="482-p6-KdW"/>
+                    <exclude reference="Mtd-7m-nKB"/>
+                    <exclude reference="pgm-Qi-gGG"/>
+                    <exclude reference="rqE-Wm-5Zz"/>
+                    <exclude reference="tvR-j0-kFI"/>
+                </mask>
+            </variation>
+            <connections>
+                <outlet property="pickerView" destination="5fb-Px-5Qp" id="0hx-JU-sMg"/>
+            </connections>
+            <point key="canvasLocation" x="334" y="145.5"/>
+        </view>
+    </objects>
+</document>

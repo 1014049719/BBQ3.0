@@ -1,0 +1,1 @@
+../../../MTA/SDK/MTAConfig.h

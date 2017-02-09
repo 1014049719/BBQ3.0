@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.XIB" version="3.0" toolsVersion="9531" systemVersion="15C50" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES">
+    <dependencies>
+        <deployment identifier="iOS"/>
+        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="9529"/>
+    </dependencies>
+    <objects>
+        <placeholder placeholderIdentifier="IBFilesOwner" id="-1" userLabel="File's Owner" customClass="BBQOperationEditViewController">
+            <connections>
+                <outlet property="maxLabel" destination="oH2-Qi-hSC" id="hDW-wQ-4Zj"/>
+                <outlet property="textView" destination="2Ho-jq-gOT" id="f1O-MS-oDf"/>
+                <outlet property="view" destination="i5M-Pr-FkT" id="sfx-zR-JGt"/>
+            </connections>
+        </placeholder>
+        <placeholder placeholderIdentifier="IBFirstResponder" id="-2" customClass="UIResponder"/>
+        <view clearsContextBeforeDrawing="NO" contentMode="scaleToFill" id="i5M-Pr-FkT">
+            <rect key="frame" x="0.0" y="0.0" width="320" height="568"/>
+            <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+            <subviews>
+                <view contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="ZFr-59-ee9">
+                    <rect key="frame" x="0.0" y="0.0" width="320" height="268"/>
+                    <subviews>
+                        <textView clipsSubviews="YES" multipleTouchEnabled="YES" contentMode="scaleToFill" textAlignment="natural" translatesAutoresizingMaskIntoConstraints="NO" id="2Ho-jq-gOT" customClass="BBQTextView">
+                            <rect key="frame" x="0.0" y="10" width="320" height="258"/>
+                            <color key="backgroundColor" white="1" alpha="1" colorSpace="calibratedWhite"/>
+                            <fontDescription key="fontDescription" type="system" pointSize="17"/>
+                            <textInputTraits key="textInputTraits" autocapitalizationType="sentences"/>
+                        </textView>
+                    </subviews>
+                    <color key="backgroundColor" white="1" alpha="1" colorSpace="calibratedWhite"/>
+                    <constraints>
+                        <constraint firstItem="2Ho-jq-gOT" firstAttribute="top" secondItem="ZFr-59-ee9" secondAttribute="top" constant="10" id="1h7-WG-F5a"/>
+                        <constraint firstItem="2Ho-jq-gOT" firstAttribute="leading" secondItem="ZFr-59-ee9" secondAttribute="leading" id="9ZP-4t-UDJ"/>
+                        <constraint firstAttribute="trailing" secondItem="2Ho-jq-gOT" secondAttribute="trailing" id="f1J-lq-GvW"/>
+                        <constraint firstAttribute="bottom" secondItem="2Ho-jq-gOT" secondAttribute="bottom" id="q4T-Fi-Bax"/>
+                    </constraints>
+                </view>
+                <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="7/200" textAlignment="right" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="oH2-Qi-hSC">
+                    <rect key="frame" x="0.0" y="268" width="320" height="18"/>
+                    <fontDescription key="fontDescription" type="system" pointSize="15"/>
+                    <color key="textColor" white="0.33333333333333331" alpha="1" colorSpace="calibratedWhite"/>
+                    <nil key="highlightedColor"/>
+                </label>
+            </subviews>
+            <color key="backgroundColor" red="0.80000000000000004" green="0.80000000000000004" blue="0.80000000000000004" alpha="1" colorSpace="calibratedRGB"/>
+            <constraints>
+                <constraint firstItem="ZFr-59-ee9" firstAttribute="leading" secondItem="i5M-Pr-FkT" secondAttribute="leading" id="CVw-cI-oNi"/>
+                <constraint firstItem="oH2-Qi-hSC" firstAttribute="leading" secondItem="i5M-Pr-FkT" secondAttribute="leading" id="F4A-U0-6Rz"/>
+                <constraint firstAttribute="trailing" secondItem="oH2-Qi-hSC" secondAttribute="trailing" id="Tjl-4v-ofU"/>
+                <constraint firstItem="ZFr-59-ee9" firstAttribute="top" secondItem="i5M-Pr-FkT" secondAttribute="top" id="WlM-MA-fgX"/>
+                <constraint firstItem="oH2-Qi-hSC" firstAttribute="top" secondItem="ZFr-59-ee9" secondAttribute="bottom" id="nR7-ah-b2X"/>
+                <constraint firstAttribute="trailing" secondItem="ZFr-59-ee9" secondAttribute="trailing" id="txK-R4-CM1"/>
+                <constraint firstAttribute="bottom" secondItem="ZFr-59-ee9" secondAttribute="bottom" constant="300" id="y3A-OH-Tjy"/>
+            </constraints>
+            <nil key="simulatedStatusBarMetrics"/>
+            <freeformSimulatedSizeMetrics key="simulatedDestinationMetrics"/>
+        </view>
+    </objects>
+</document>

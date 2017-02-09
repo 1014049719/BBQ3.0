@@ -1,0 +1,249 @@
+//
+//  BBQLoginManager.m
+//  BBQ
+//
+//  Created by 朱琨 on 15/10/18.
+//  Copyright © 2015年 bbq. All rights reserved.
+//
+
+#import "BBQLoginManager.h"
+#import "XGPush.h"
+#import "JJFMDB.h"
+#import "BBQLogoutApi.h"
+#import "JJQueueManager.h"
+#import "AppDelegate.h"
+#import "BBQDailyReportOption.h"
+#import "DES.h"
+#import "BBQResetXGTokenApi.h"
+#import "BBQPublishManager.h"
+#import <SSKeychain.h>
+#import "JNKeychain.h"
+
+NSString * const kLoginPreUsername = @"pre_user_name";
+NSString * const kLoginCurUid = @"login_cur_uid";
+NSString * const kLoginCurUsername = @"login_cur_username";
+NSString * const kXGToken = @"xgpush_oken";
+
+@implementation BBQLoginManager
+
+@synthesize curUser = _curUser;
+@synthesize token = _token;
+
++ (instancetype)sharedManager {
+    static BBQLoginManager *sharedInstance = nil;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{
+        sharedInstance = [[self alloc] init];
+    });
+    return sharedInstance;
+}
+
+#pragma mark - 登录退出
++ (void)loginWithUsername:(NSString *)username password:(NSString *)password loginType:(BBQLoginType)type success:(CompletionBlock)success failure:(CompletionBlock)failure {
+    BBQLoginApi *api = [[BBQLoginApi alloc] initWithUsername:username password:[DES encryptStr:password] type:type];
+    [api startWithCompletionBlockWithSuccess:^(YTKBaseRequest *request) {
+        [[BBQLoginManager sharedManager] doLogin:request.responseJSONObject[@"data"] withType:type];
+//        [SSKeychain setPassword:password forService:@"BBQ" account:[TheCurUser.member.uid stringValue]];
+//        [JNKeychain saveValue:password forKey:[TheCurUser.member.uid stringValue]];
+        [[NSUserDefaults standardUserDefaults] setValue:password forKey:[NSString stringWithFormat:@"password%@", [TheCurUser.member.uid stringValue]]];
+        BBQLoginManager *manager = [BBQLoginManager sharedManager];
+        TheCurUser.openid = manager.openid;
+        TheCurUser.access_token = manager.access_token;
+        if (type == BBQLoginTypeAutoCreateWithQQ || type == BBQLoginTypeQQ || type == BBQLoginTypeBindingPhoneWithQQ) {
+            TheCurUser.authtype = BBQLoginTypeQQ;
+        } else if (type == BBQLoginTypeAutoCreateWithWeChat || type == BBQLoginTypeBindingPhoneWithWeChat || type == BBQLoginTypeWeChat) {
+            TheCurUser.authtype = BBQLoginTypeWeChat;
+        } else {
+            TheCurUser.authtype = BBQLoginTypeNormal;
+        }
+        if (success) {
+            success(request);
+        }
+    } failure:^(YTKBaseRequest *request) {
+        if (failure) {
+            failure(request);
+        }
+    }];
+}
+
++ (void)autoLogin {
+    if (!TheCurUser) return;
+    
+    BBQLoginManager *manager = [BBQLoginManager sharedManager];
+    manager.openid = TheCurUser.openid;
+    manager.access_token = TheCurUser.access_token;
+    manager.avartarurl = TheCurUser.member.avartar;
+    manager.nickname = TheCurUser.member.nickname;
+    NSString *password = [[NSUserDefaults standardUserDefaults] objectForKey:[NSString stringWithFormat:@"password%@", [TheCurUser.member.uid stringValue]]];
+    [BBQLoginManager loginWithUsername:TheCurUser.member.username password:password loginType:TheCurUser.authtype success:nil failure:nil];
+    
+}
+
+- (void)logout {
+    BBQLogoutApi *api = [BBQLogoutApi new];
+    [api start];
+    [BBQLoginManager doLogout];
+}
+
++ (BOOL)isLogin {
+    BOOL loginStatus = [[NSUserDefaults standardUserDefaults] boolForKey:kLoginStatus];
+    if (!loginStatus) return NO;
+#ifdef TARGET_PARENT
+    if (TheCurUser && TheCurUser.baobaodata.count) return YES;
+#else
+    if (TheCurUser) return YES;
+#endif
+    return NO;
+}
+
+- (void)doLogin:(NSDictionary *)loginData withType:(BBQLoginType)type {
+    if (loginData) {
+        [BBQLoginManager saveCookies];
+        if (loginData[@"member"] == nil) {
+            if (self.curUser) {
+                self.curUser.isbind = NO;
+            }
+            return;
+        }
+        
+        User *user = [User modelWithDictionary:loginData];
+        NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+        [defaults setObject:user.member.uid forKey:kLoginCurUid];
+        [defaults synchronize];
+        [[JJQueueManager sharedManager] resetQueue];
+        if (self.curUser) {
+            for (NSString *key in [User modelPropertyBlacklist]) {
+                [user setValue:[self.curUser valueForKey:key] forKey:key];
+            }
+            self.curUser = user;
+        } else {
+            _curUser = user;
+            [_curUser save];
+        }
+
+        if (type == BBQLoginTypeNormal || type == BBQLoginTypeWeChat|| type == BBQLoginTypeQQ ) {
+            if (![BBQLoginManager isLogin]) {
+//                User *user = [User modelWithDictionary:loginData];
+//                NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+//                [defaults setObject:user.member.uid forKey:kLoginCurUid];
+//                [defaults synchronize];
+//                [[JJQueueManager sharedQueue] resetQueue];
+//                for (NSString *key in [User modelPropertyBlacklist]) {
+//                    [user setValue:[TheCurUser valueForKey:key] forKey:key];
+//                }
+//                TheCurUser = user;
+            } else {
+                if ([loginData[@"isbind"] boolValue]) {
+                    TheCurUser.qqbind = [loginData[@"qqbind"] boolValue];
+                    TheCurUser.wxbind = [loginData[@"wxbind"] boolValue];
+                }
+            }
+        }
+        
+        TheCurUser.isbind = [loginData[@"isbind"] boolValue];
+
+//        if (![TheCurUser.member.groupkey isEqualToNumber:@1]) {
+//            BBQDailyReportOption *option = [BBQDailyReportOption new];
+//            [option fetchData];
+//        }
+        [TheCurUser save];
+        [CommonFunc getAnnouncementType];
+//        [CommonFunc explorePhotoFromGroup:nil];
+    } else {
+        [BBQLoginManager doLogout];
+    }
+}
+
++ (void)doLogout {
+    [TheCurUser save];
+    [UIApplication sharedApplication].applicationIconBadgeNumber = 0;
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    [defaults setBool:NO forKey:kLoginStatus];
+    [defaults synchronize];
+    [defaults removeObjectForKey:[NSString stringWithFormat:@"password%@", [TheCurUser.member.uid stringValue]]];
+    [BBQLoginManager deleteCookies];
+    [[BBQPublishManager sharedManager] stopWorking];
+    [[BBQLoginManager sharedManager] bk_removeAllBlockObservers];
+    [BBQLoginManager setXGAccountWithCurUser];
+    [((AppDelegate *)[UIApplication sharedApplication].delegate)
+     setupLoginViewControllerInit:NO];
+}
+
+#pragma mark - Cookie
++ (void)saveCookies {
+    NSData *cookiesData = [NSKeyedArchiver archivedDataWithRootObject: [[NSHTTPCookieStorage sharedHTTPCookieStorage] cookies]];
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+    [defaults setObject: cookiesData forKey: @"sessionCookies"];
+    [defaults synchronize];
+}
+
++ (void)loadCookies {
+    NSArray *cookies = [NSKeyedUnarchiver unarchiveObjectWithData: [[NSUserDefaults standardUserDefaults] objectForKey: @"sessionCookies"]];
+    NSHTTPCookieStorage *cookieStorage = [NSHTTPCookieStorage sharedHTTPCookieStorage];
+    for (NSHTTPCookie *cookie in cookies){
+        [cookieStorage setCookie: cookie];
+    }
+}
+
++ (void)deleteCookies {
+    NSArray *cookies = [[NSHTTPCookieStorage sharedHTTPCookieStorage] cookies];
+    [cookies enumerateObjectsUsingBlock:^(NSHTTPCookie *  _Nonnull obj, NSUInteger idx, BOOL * _Nonnull stop) {
+        if ([obj.domain hasSuffix:@".jyex.cn"]) {
+            [[NSHTTPCookieStorage sharedHTTPCookieStorage] deleteCookie:obj];
+        }
+    }];
+}
+
+#pragma mark - XGPush
++ (void)setXGAccountWithCurUser {
+    if ([self isLogin]) {
+        User *user = [BBQLoginManager sharedManager].curUser;
+        if ([user.member.username isNotBlank]) {
+            NSString *username = user.member.username;
+            [XGPush setAccount:username];
+            [(AppDelegate *)[UIApplication sharedApplication].delegate registerPush];
+        }
+    } else {
+        [XGPush setAccount:nil];
+        [XGPush unRegisterDevice];
+    }
+}
+
+#pragma mark - Getter & Setter
+- (User *)curUser {
+    if (!_curUser || ![_curUser.member.uid.stringValue isEqualToString:[[NSUserDefaults standardUserDefaults] stringForKey:kLoginCurUid]]) {
+        [User searchSyncAll:^(NSArray *results) {
+            if (results.count) {
+                _curUser = results.firstObject;
+            }
+        }];
+    }
+    return _curUser;
+}
+
+- (void)setCurUser:(User *)curUser {
+    _curUser = curUser;
+    [_curUser save];
+}
+
+- (NSString *)token {
+    NSString *tokenStr = [[NSUserDefaults standardUserDefaults] stringForKey:kXGToken];
+    if (!tokenStr) {
+        tokenStr = [UIDevice currentDevice].identifierForVendor.UUIDString;
+        [[NSUserDefaults standardUserDefaults] setObject:tokenStr forKey:kXGToken];
+        [[NSUserDefaults standardUserDefaults] synchronize];
+    }
+    return tokenStr;
+}
+
+- (void)setToken:(NSString *)token {
+    NSString *oldToken = self.token;
+    if (![token isEqualToString:oldToken]) {
+        [[NSUserDefaults standardUserDefaults] setObject:token forKey:kXGToken];
+        [[NSUserDefaults standardUserDefaults] synchronize];
+        BBQResetXGTokenApi *api = [[BBQResetXGTokenApi alloc] initWithOldToken:oldToken];
+        [api start];
+    }
+}
+
+@end

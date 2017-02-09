@@ -1,0 +1,1 @@
+../../../TRMWPhotoBrowser/Pod/Classes/UIImage+MWPhotoBrowser.h

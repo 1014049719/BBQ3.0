@@ -1,0 +1,142 @@
+//
+//  MasterMineTableViewControllerTableViewController.m
+//  BBQ
+//
+//  Created by wth on 15/8/13.
+//  Copyright (c) 2015年 bbq. All rights reserved.
+//
+
+#import "MasterMineTableViewControllerTableViewController.h"
+#import "JifenViewController.h"
+#import "TeLeDouViewController.h"
+#import "UserDataModel.h"
+#import "BBQNewCardViewController.h"
+
+@interface MasterMineTableViewControllerTableViewController ()
+
+@property(strong, nonatomic) UserDataModel *model;
+
+//设置 红点
+@property (weak, nonatomic) IBOutlet UILabel *label_dian;
+//缓存
+@property(strong,nonatomic)NSUserDefaults *UserDefault;
+
+@end
+
+@implementation MasterMineTableViewControllerTableViewController
+
+- (void)viewDidLoad {
+  [super viewDidLoad];
+
+    _UserDefault=[NSUserDefaults standardUserDefaults];
+    if ([_UserDefault boolForKey:@"shezhi_dian"]) {
+        [self.label_dian removeFromSuperview];
+    }
+  self.tableView.tableFooterView = [UIView new];
+}
+
+- (void)viewWillAppear:(BOOL)animated {
+  [super viewWillAppear:animated];
+  [self getJiFenData];
+}
+
+#pragma mark - Table view data source
+- (CGFloat)tableView:(UITableView *)tableView
+    heightForRowAtIndexPath:(NSIndexPath *)indexPath {
+
+  if (indexPath.row == 1) {
+    return 0;
+  }
+
+  else
+    return 44;
+}
+
+- (void)tableView:(UITableView *)tableView
+didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
+
+    [self.tableView deselectRowAtIndexPath:indexPath animated:YES];
+
+    UIStoryboard *RootStoryboard =
+    [UIStoryboard storyboardWithName:@"Teacher" bundle:nil];
+    
+    switch (indexPath.row) {
+        case 0: {
+            
+            JifenViewController *JifenVcl = [RootStoryboard
+                                             instantiateViewControllerWithIdentifier:@"JifenViewController"];
+            
+            [self.navigationController pushViewController:JifenVcl animated:YES];
+        } break;
+        case 1: {
+            
+            TeLeDouViewController *TeLeDouVcl =
+            [RootStoryboard instantiateViewControllerWithIdentifier:@"TeLeDouVcl"];
+            TeLeDouVcl.bbq_ld_num = _model.bbq_ld_num;
+            [self.navigationController pushViewController:TeLeDouVcl animated:YES];
+        } break;
+        case 2: {
+            
+            UICollectionViewController *GiftCollectionViewController =
+            [RootStoryboard instantiateViewControllerWithIdentifier:
+             @"GiftCollectionViewController"];
+            
+            [self.navigationController pushViewController:GiftCollectionViewController
+                                                 animated:YES];
+        } break;
+        case 3: {
+            
+            BBQNewCardViewController *BBQNewCardVcl=[[BBQNewCardViewController alloc] init];
+            BBQNewCardVcl.title = @"成长书";
+            BBQNewCardVcl.hidesBottomBarWhenPushed=YES;
+            [self.navigationController pushViewController:BBQNewCardVcl animated:YES];
+        } break;
+        case 4: {
+            
+            UITableViewController *TeSetLocationVC = [RootStoryboard
+                                                      instantiateViewControllerWithIdentifier:@"TeSetLocationVC"];
+            
+            [self.navigationController pushViewController:TeSetLocationVC animated:YES];
+        } break;
+        case 5: {
+            
+            [_UserDefault setBool:YES forKey:@"shezhi_dian"];
+            [_label_dian removeFromSuperview];
+
+            UIStoryboard *SB =
+            [UIStoryboard storyboardWithName:@"RootTabBar" bundle:nil];
+            UIViewController *vc =
+            [SB instantiateViewControllerWithIdentifier:@"settingup"];
+            [self.navigationController pushViewController:vc animated:YES];
+        } break;
+        case 6: {
+            
+            UIStoryboard *SB =
+            [UIStoryboard storyboardWithName:@"RootTabBar" bundle:nil];
+            UIViewController *vc =
+            [SB instantiateViewControllerWithIdentifier:@"postUserProblem"];
+            [self.navigationController pushViewController:vc animated:YES];
+        } break;
+            
+        default:
+            break;
+    }
+}
+
+- (void)getJiFenData {
+  NSDictionary *params = @{ @"uid" : TheCurUser.member.uid };
+  [BBQHTTPRequest
+       queryWithType:BBQHTTPRequestTypeGetUserData
+               param:params
+      successHandler:^(AFHTTPRequestOperation *operation,
+                       NSDictionary *responseObject, bool apiSuccess) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+          _model = [UserDataModel modelWithJSON:responseObject[@"data"]];
+          self.jiFenNumLabel.text = _model.bbq_jifen_num;
+          self.leDouNumLabel.text = _model.bbq_ld_num;
+        });
+      } errorHandler:nil
+      failureHandler:nil];
+}
+
+@end

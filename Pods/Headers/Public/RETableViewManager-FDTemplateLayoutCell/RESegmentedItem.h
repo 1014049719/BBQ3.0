@@ -1,0 +1,1 @@
+../../../RETableViewManager-FDTemplateLayoutCell/RETableViewManager/Items/RESegmentedItem.h

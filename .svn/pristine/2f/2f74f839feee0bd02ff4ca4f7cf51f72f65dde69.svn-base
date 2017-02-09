@@ -1,0 +1,513 @@
+//
+//  BBQBabyDataCreateViewController.m
+//  BBQ
+//
+//  Created by wenjing on 15/11/23.
+//  Copyright © 2015年 bbq. All rights reserved.
+//
+
+#import "BBQBabyDataCreateViewController.h"
+#import "DatePicker.h"
+#import <DateTools.h>
+#import "BBQSetNameViewController.h"
+#import "BBQSetPlaceViewController.h"
+#import "BBQSetClassViewController.h"
+#import "BBQSetSchoolViewController.h"
+#import "BBQSchoolDataModel.h"
+#import "BBQClassDataModel.h"
+#import "RelationshipModel.h"
+#import "RelationshipViewController.h"
+#import "BBQDynamicTableViewController.h"
+#import "AppDelegate.h"
+#import "BBQPlaceParam.h"
+#import "ResetPassKeyTableViewController.h"
+
+@interface BBQBabyDataCreateViewController ()<
+UITextFieldDelegate, UIImagePickerControllerDelegate,
+UINavigationControllerDelegate, UIActionSheetDelegate>
+
+@property(weak, nonatomic) IBOutlet UIButton *headBtn;
+@property (weak, nonatomic) IBOutlet UIButton *nameButton;
+@property (weak, nonatomic) IBOutlet UIButton *relatButton;
+@property (weak, nonatomic) IBOutlet UIButton *placeButton;
+@property (weak, nonatomic) IBOutlet UIButton *schoolButton;
+@property (weak, nonatomic) IBOutlet UIButton *classButton;
+@property(strong, nonatomic) BBQBabyModel *baobao;
+@property(assign, nonatomic) BOOL datePickerIsOn;
+
+@property(weak, nonatomic) IBOutlet UIButton *birthdayButton;
+@property(assign, nonatomic) int gender;
+
+@property(strong, nonatomic) DatePicker *dp;
+@property(weak, nonatomic) IBOutlet UIButton *boyButton;
+@property(weak, nonatomic) IBOutlet UIButton *girlButton;
+
+//相册
+@property(strong, nonatomic) UIImagePickerController *imagePicker;
+//图片转换的data对象
+@property(strong, nonatomic) NSData *data;
+//图片二进制路径
+@property(strong, nonatomic) NSString *filePathStr;
+
+@property(strong, nonatomic) NSMutableArray *imageAry;
+@property(strong, nonatomic) UploadFileModel *uploadFileModel;
+
+@property (nonatomic, strong) RelationshipModel *relation;
+@property (nonatomic, strong) BBQPlaceParam *placeParam;
+
+@end
+
+@implementation BBQBabyDataCreateViewController
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    [self initValues];
+    //相册
+    _imagePicker = [[UIImagePickerController alloc] init];
+    _imagePicker.allowsEditing = YES;
+    //要同时包含<UIImagePickerControllerDelegate,UINavigationControllerDelegate>
+    _imagePicker.delegate = self;
+    
+    self.headBtn.layer.masksToBounds = YES;
+    self.headBtn.layer.cornerRadius = CGRectGetHeight(self.headBtn.frame) / 2.0;
+    
+    NSArray *ary =
+    [[NSBundle mainBundle] loadNibNamed:@"DatePicker" owner:self options:nil];
+    _dp = ary[0];
+    [self.birthdayButton setTitle:@"请选择宝宝的出生日期"
+                         forState:UIControlStateNormal];
+    if (_selectedClass) {
+        [self.classButton setTitleColor:[UIColor blackColor] forState:UIControlStateNormal];
+        [self.classButton setTitle:_selectedClass.classname
+                          forState:UIControlStateNormal];
+    }
+    if (_selectedClass) {
+        [self.schoolButton setTitleColor:[UIColor blackColor] forState:UIControlStateNormal];
+        [self.schoolButton setTitle:_selectedSchool.schoolname
+                           forState:UIControlStateNormal];
+    }
+}
+- (void)initValues {
+    
+    if (self.imageAry == nil) {
+        self.imageAry = [NSMutableArray arrayWithCapacity:0];
+    }
+    if (self.uploadFileModel == nil) {
+        self.uploadFileModel = [[UploadFileModel alloc] init];
+    }
+}
+//设置上传宝宝头像按钮
+- (IBAction)BabyHeaderIconBtnClick:(id)sender {
+    
+    //创建UIActionSheet
+    UIActionSheet *actionSheet =
+    [[UIActionSheet alloc] initWithTitle:@"选择照片"
+                                delegate:self
+                       cancelButtonTitle:@"取消"
+                  destructiveButtonTitle:@"来自相册"
+                       otherButtonTitles:@"拍照", nil];
+    [actionSheet showInView:self.view];
+}
+
+// UIActionSheet选择事件
+- (void)actionSheet:(UIActionSheet *)actionSheet
+clickedButtonAtIndex:(NSInteger)buttonIndex {
+    
+    switch (buttonIndex) {
+        case 0: {
+            _imagePicker.sourceType = UIImagePickerControllerSourceTypePhotoLibrary;
+            //跳转到相册
+            [self presentViewController:_imagePicker animated:YES completion:nil];
+        } break;
+        case 1: {
+            _imagePicker.sourceType = UIImagePickerControllerSourceTypeCamera;
+            [self presentViewController:_imagePicker animated:YES completion:nil];
+        } break;
+        default:
+            break;
+    }
+}
+
+// imagePickerView代理 照片选择完成
+- (void)imagePickerController:(UIImagePickerController *)picker
+didFinishPickingMediaWithInfo:(NSDictionary *)info {
+    
+    UIImage *image = info[UIImagePickerControllerEditedImage];
+    
+    NSString *filenameGuid = [NSString stringWithUUID];
+    NSDictionary *dicFileInfo =
+    [CommonFunc saveJYEXPic:image fileguid:filenameGuid mode:@"L"];
+    
+    if (!dicFileInfo) {
+        [SVProgressHUD showErrorWithStatus:@"保存文件失败"];
+        return;
+    }
+    
+    NSString *filepath = dicFileInfo[@"slt"][@"filepath"];
+    UIImage *imagefile = [UIImage imageWithContentsOfFile:filepath];
+    
+    self.uploadFileModel.fileData = UIImageJPEGRepresentation(imagefile, 1);
+    self.uploadFileModel.fileName = filepath;
+    [self.imageAry addObject:self.uploadFileModel];
+    
+    //刚换按钮图片
+    [self.headBtn setBackgroundImage:imagefile forState:UIControlStateNormal];
+    //完成后返回界面
+    [self dismissViewControllerAnimated:YES completion:nil];
+    
+    
+}
+
+// imagePickerView代理 照片选择取消
+- (void)imagePickerControllerDidCancel:(UIImagePickerController *)picker {
+    
+    //取消后返回界面
+    [self dismissViewControllerAnimated:NO completion:nil];
+}
+
+#pragma mark 上传头像请求
+- (void)UploadHeadIconWithUrlStr:(NSString *)UrlStr {
+    //是宝宝的头像
+    NSDictionary *paramsDic = @{ @"uid" : TheCurBaoBao.uid };
+    
+    [HttpTool multipartPostFileDataWithPath:UrlStr
+                                     params:paramsDic
+                                    dataAry:self.imageAry
+                                    success:^(id JSON) {
+                                        dispatch_async(
+                                                       dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+                                                           NSDictionary *dic = JSON;
+                                                           NSInteger res = [dic[@"res"] integerValue];
+                                                           if (res == 1) {
+                                                               dispatch_async(dispatch_get_main_queue(), ^{
+                                                                   //    [SVProgressHUD showSuccessWithStatus:@"上传成功"];
+                                                                   
+                                                                   // self.baby.avartar = self.uploadFileModel.fileName;
+                                                                   //更新刷新数
+                                                                   
+                                                                   //通知
+                                                                   [[NSNotificationCenter defaultCenter]
+                                                                    postNotificationName:
+                                                                    kSetNeedsRefreshEntireDataNotification
+                                                                    object:nil
+                                                                    userInfo:@{
+                                                                               @"type" : @(BBQRefreshNotificationTypeAll)
+                                                                               }];
+                                                               });
+                                                               
+                                                           } else {
+                                                               dispatch_async(dispatch_get_main_queue(), ^{
+                                                                   
+                                                                   //     [SVProgressHUD showErrorWithStatus:message];
+                                                               });
+                                                           }
+                                                       });
+                                    }
+                                    failure:^(NSError *error) {
+                                        dispatch_async(dispatch_get_main_queue(), ^{
+                                            [SVProgressHUD showErrorWithStatus:[error localizedDescription]];
+                                        });
+                                    }];
+}
+//选择宝宝生日按钮
+- (IBAction)BabyBirthdayBtnClick:(UIButton *)sender {
+    NSDate *date = [NSDate date];
+    NSString *now = [date formattedDateWithFormat:@"yyyy-MM-dd"];
+    _dp.datePicker.datePickerMode = UIDatePickerModeDate;
+    WS(weakSelf)
+    _dp.datePickerCallBack = ^(NSString *time) {
+        if ([time compare:now] == NSOrderedDescending) {
+            [SVProgressHUD showErrorWithStatus:@"宝"
+             @"宝生日有误，请重新选择"];
+        } else {
+            [weakSelf.birthdayButton setTitle:time forState:UIControlStateNormal];
+        }
+    };
+    [self.view addSubview:_dp];
+    if (_dp.datePickerIsOn == NO) {
+    }
+    
+    _dp.datePickerIsOn = YES;
+}
+- (void)touchesBegan:(NSSet *)touches withEvent:(UIEvent *)event {
+    [_dp removeFromSuperview];
+}
+//选择性别
+- (IBAction)SexBtnClick:(UIButton *)sender {
+    
+    for (int i = 0; i < 2; i++) {
+        
+        UIButton *button = (UIButton *)[self.view viewWithTag:10 + i];
+        button.selected = NO;
+    }
+    sender.selected = YES;
+    
+    if ([sender.titleLabel.text isEqualToString:@"男孩"]) {
+        self.gender = 1;
+    } else {
+        self.gender = 2;
+    }
+}
+- (IBAction)nameButtonClick {
+    BBQSetNameViewController *NameVC= [[BBQSetNameViewController alloc] init];
+    NameVC.title = @"填写姓名";
+    WS(weakSelf);
+    [NameVC returnText:^(NSString *showText) {
+        [weakSelf.nameButton setTitleColor:[UIColor blackColor] forState:UIControlStateNormal];
+        [weakSelf.nameButton setTitle:showText
+                             forState:UIControlStateNormal];}];
+    [self.navigationController pushViewController:NameVC animated:NO];
+}
+
+- (IBAction)relatButtonClick {
+    [self performSegueWithIdentifier:@"toSetRelationship" sender:nil];
+}
+
+- (IBAction)placeButtonClick {
+    BBQSetPlaceViewController *PlaceVC= [[BBQSetPlaceViewController alloc] init];
+    PlaceVC.title = @"选择地区";
+    WS(weakSelf);
+    [PlaceVC returnText:^(NSString *showText,BBQPlaceParam *placeParam) {
+        if(showText.length > 0){
+            [weakSelf.placeButton setTitleColor:[UIColor blackColor] forState:UIControlStateNormal];
+            [weakSelf.placeButton setTitle:showText
+                                  forState:UIControlStateNormal];
+            weakSelf.placeParam = placeParam;
+            if (self.selectedSchool) {
+                self.selectedSchool = nil;
+            }
+            if (self.selectedClass) {
+                self.selectedClass = nil;
+            }
+        }
+    }];
+    [self.navigationController pushViewController:PlaceVC animated:NO];
+}
+- (IBAction)schoolButtonClick {
+    if (self.placeButton.titleLabel.text.length ==0|| [self.placeButton.titleLabel.text hasPrefix:@"请选择"]) {
+        [SVProgressHUD showErrorWithStatus:@"请先选择地区!"];
+        [self performSelector:@selector(dismiss:) withObject:nil afterDelay:1];
+        return;
+    }
+    BBQSetSchoolViewController *SchoolVC= [[BBQSetSchoolViewController alloc] init];
+    SchoolVC.title = @"填写学校名称";
+    SchoolVC.placeParam = self.placeParam;
+    WS(weakSelf);
+    [SchoolVC returnText:^(BBQSchoolDataModel *model) {
+        if(model){
+            weakSelf.selectedSchool = model;
+            if (self.selectedClass) {
+                self.selectedClass = nil;
+            }
+        }
+    }];
+    [self.navigationController pushViewController:SchoolVC animated:NO];
+}
+
+- (IBAction)classButtonClick {
+    if (self.schoolButton.titleLabel.text.length ==0|| [self.schoolButton.titleLabel.text hasPrefix:@"请填写"]) {
+        [SVProgressHUD showErrorWithStatus:@"请先填写学校!"];
+        [self performSelector:@selector(dismiss:) withObject:nil afterDelay:1];
+        return;
+    }
+    BBQSetClassViewController *ClassVC= [[BBQSetClassViewController alloc] init];
+    ClassVC.title = @"填写班级名称";
+    ClassVC.selectedSchool = self.selectedSchool;
+    WS(weakSelf);
+    [ClassVC returnText:^(BBQClassDataModel *model) {
+        if(model){
+            weakSelf.selectedClass = model;
+        }
+    }];
+    [self.navigationController pushViewController:ClassVC animated:NO];
+}
+- (void)prepareForSegue:(UIStoryboardSegue *)segue sender:(id)sender {
+    if ([segue.identifier isEqualToString:@"toSetRelationship"]) {
+        RelationshipViewController *vc = segue.destinationViewController;
+        WS(weakSelf);
+        vc.relationshipCallBack = ^(RelationshipModel *model) {
+            weakSelf.relation = model;
+            [weakSelf.relatButton setTitleColor:[UIColor blackColor] forState:UIControlStateNormal];
+            [weakSelf.relatButton setTitle:model.relaName
+                                  forState:UIControlStateNormal];
+        };
+    }
+}
+- (void)dismiss:(id)sender {
+    [SVProgressHUD dismiss];
+}
+
+//完成按钮
+- (IBAction)completeBtnClick:(id)sender {
+    //    NSDate *date = [NSDate dateWithString:self.birthdayButton.titleLabel.text
+    //                             formatString:@"yyyy-MM-dd"];
+    //    NSInteger year = [date year];
+    //    NSInteger month = [date month];
+    //    NSInteger day = [date day];
+    //
+    //    if ([self.birthdayButton.titleLabel.text
+    //         isEqualToString:@"请选择宝宝的出生日期"]) {
+    //        [SVProgressHUD showErrorWithStatus:@"请选择宝宝的出生日期"];
+    //    }
+    //
+    //    else if (year == 0 || month == 0 || day == 0) {
+    //        [SVProgressHUD showErrorWithStatus:@"请选择正确的宝宝出生日期"];
+    //    }
+    //
+    //    else if (self.gender == 0) {
+    //        [SVProgressHUD showErrorWithStatus:@"请选择宝宝性别"];
+    //    }else
+    if ([self.nameButton.titleLabel.text hasPrefix:@"请填写"] || self.nameButton.titleLabel.text.length ==0) {
+        [SVProgressHUD showErrorWithStatus:@"请填写宝宝的姓名"];
+        //    }else if ([self.placeButton.titleLabel.text
+        //               hasPrefix:@"请选择"] || self.placeButton.titleLabel.text.length ==0) {
+        //        [SVProgressHUD showErrorWithStatus:@"请选择地区"];
+    }else if ([self.relatButton.titleLabel.text
+               hasPrefix:@"请选择"] || self.relatButton.titleLabel.text.length ==0) {
+        [SVProgressHUD showErrorWithStatus:@"请选择与宝宝的关系"];
+        //    }else if ([self.schoolButton.titleLabel.text
+        //               hasPrefix:@"请填写"] || self.schoolButton.titleLabel.text.length ==0) {
+        //        [SVProgressHUD showErrorWithStatus:@"请填写幼儿园名称或学校名称"];
+        //    }else if ([self.classButton.titleLabel.text
+        //               hasPrefix:@"请填写"] || self.relatButton.titleLabel.text.length ==0) {
+        //        [SVProgressHUD showErrorWithStatus:@"请填写宝宝所在班级"];
+    }
+    /**
+     姓名 realname string
+     生日 birthdayt string 格式：yyyy-m-d
+     性别 gender int 1-男   2-女
+     关系 gxid int
+     地区 areajson string 格式：{“resideprovince”:”省”,”residecity":”市”,” residedist”:”区”}
+     学校 schoolid int 学校ID
+     班级 classuid int 班级ID
+     */
+    else {
+        [SVProgressHUD showWithStatus:@"请稍候..."];
+        NSMutableDictionary *params = [NSMutableDictionary dictionary];
+        params[@"realname"]= self.nameButton.titleLabel.text;
+        NSInteger gxid = [self.relation.relationshipTag intValue] -200;
+        params[@"gxid"] = @(gxid);
+        if (gxid == 100) {
+            params[@"gxname"] = self.relation.relaName;
+        }
+        if (![self.birthdayButton.titleLabel.text isEqualToString:@"请选择宝宝的出生日期"]){
+            params[@"birthdayt"] = self.birthdayButton.titleLabel.text;
+        }
+        if (self.gender) {
+            params[@"gender"] = @(self.gender);
+        }
+        if (![self.placeButton.titleLabel.text hasPrefix:@"请选择"]) {
+            params[@"areajson"] = self.placeButton.titleLabel.text;
+        }
+        if (![self.schoolButton.titleLabel.text hasPrefix:@"请填写"]){
+            params[@"schoolid"] =self.selectedSchool.schoolid;
+        }
+        if (![self.classButton.titleLabel.text hasPrefix:@"请填写"]){
+            params[@"classuid"] = self.selectedClass.classid;
+        }
+        [BBQHTTPRequest
+         queryWithType:BBQHTTPRequestTypeCreateBaobao
+         param:params
+         successHandler:^(AFHTTPRequestOperation *operation,
+                          NSDictionary *responseObject, bool apiSuccess) {
+             BBQBabyModel *babymodel = [BBQBabyModel modelWithDictionary:responseObject[@"data"][@"baobaoData"]];
+             
+             if (self.imageAry.count) {
+                 // 上传图片请求
+                 [self
+                  UploadHeadIconWithUrlStr:[CS_URL_BASE
+                                            stringByAppendingString:URL_UPLOAD_AVATAR] ];
+             }
+             
+             NSNumber *status = responseObject[@"data"][@"status"];
+             if ([status isEqual:@0]) {
+                 [SVProgressHUD showErrorWithStatus:@"该宝宝已存在"];
+             }else if ([status isEqual:@1] ) {
+                 [self updateCurBaobao:babymodel];
+                 [self jumptoTopController];
+             }else if ([status isEqual:@3]){
+                 [self updateCurBaobao:babymodel];
+                 [SVProgressHUD showWithStatus:@"成为宝宝圈主"];
+                 dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(3.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                     [SVProgressHUD dismiss];
+                     [self jumptoTopController];
+                 });
+             }
+             else{
+                 [self updateCurBaobao:babymodel];
+                 if (self.selectedClass.classname) {
+                     [SVProgressHUD showWithStatus:[NSString stringWithFormat:@"宝宝所在%@加入申请已发送给老师,请等待老师的审核!",self.selectedClass.classname]];
+                     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(5.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                         [SVProgressHUD dismiss];
+                         [self jumptoTopController];
+                     });
+                 }else
+                     [self jumptoTopController];
+             }
+         } errorHandler:^(NSDictionary *responseObject) {
+             NSString *msg = responseObject[@"msg"];
+             NSRange range1 = [msg rangeOfString:@"（"];//匹配得到的下标
+             NSRange range2 = [msg rangeOfString:@"）"];//匹配得到的下标
+             if (range2.location > range1.location) {
+                 NSRange range=NSMakeRange(range1.location+1, range2.location - range1.location-1);
+                 msg = [msg substringWithRange:range];//截取范围类的字符串
+             }
+             [SVProgressHUD showErrorWithStatus:msg];
+             
+         }
+         failureHandler:^(AFHTTPRequestOperation *operation, NSError *error) {
+             [SVProgressHUD dismiss];
+         }];
+    }
+}
+-(void)jumptoTopController{
+    
+    if (self.type == BBQBabyDataCreateTypeNormal) {
+        if (((UITabBarController*)([UIApplication sharedApplication].keyWindow.rootViewController)).selectedIndex !=0) {
+            ((UITabBarController*)([UIApplication sharedApplication].keyWindow.rootViewController)).selectedIndex =0;
+        }
+        [self.navigationController popToRootViewControllerAnimated:YES];
+    }else{
+        [((AppDelegate *)[UIApplication sharedApplication].delegate)
+         setupTabBarController];
+    }
+}
+-(void)setSelectedClass:(BBQClassDataModel *)selectedClass{
+    _selectedClass = selectedClass;
+    [self.classButton setTitleColor:[UIColor blackColor] forState:UIControlStateNormal];
+    [self.classButton setTitle:selectedClass.classname
+                      forState:UIControlStateNormal];
+}
+-(void)setSelectedSchool:(BBQSchoolDataModel *)selectedSchool{
+    _selectedSchool = selectedSchool;
+    [self.schoolButton setTitleColor:[UIColor blackColor] forState:UIControlStateNormal];
+    [self.schoolButton setTitle:selectedSchool.schoolname
+                       forState:UIControlStateNormal];
+    
+}
+
+-(void)jumpToResetPass{
+    UIStoryboard *storyBoard =
+    [UIStoryboard storyboardWithName:@"RootTabBar" bundle:nil];
+    ResetPassKeyTableViewController *ResetPassVcl =
+    [storyBoard instantiateViewControllerWithIdentifier:@"ResetPassVcl"];
+    [self.navigationController pushViewController:ResetPassVcl animated:YES];
+}
+-(void)updateCurBaobao:(BBQBabyModel *)babymodel{
+    //将新建的宝宝同步到TheCurUser.baobaodata
+    self.baobao = babymodel;
+    [TheCurUser addABaby:babymodel];
+    TheCurBaoBao = self.baobao;
+    //发送通知 刷新关注列表
+    [[NSNotificationCenter defaultCenter]
+     postNotificationName:@"baobaoDataChange"
+     object:nil];
+    
+    [[NSNotificationCenter defaultCenter]
+     postNotificationName:kSetNeedsRefreshEntireDataNotification
+     object:nil
+     userInfo:@{
+                @"type" : @(BBQRefreshNotificationTypeAll)
+                }];
+}
+@end

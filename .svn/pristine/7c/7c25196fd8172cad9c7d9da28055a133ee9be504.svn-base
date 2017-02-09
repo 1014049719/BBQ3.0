@@ -1,0 +1,792 @@
+//
+//  QBAssetsViewController.m
+//  QBImagePicker
+//
+//  Created by Katsuma Tanaka on 2015/04/06.
+//  Copyright (c) 2015 Katsuma Tanaka. All rights reserved.
+//
+
+#import "AuthorizationHelper.h"
+#import "Dynamic.h"
+#import "QBAssetsViewController.h"
+#import <AssetsLibrary/AssetsLibrary.h>
+
+// Views
+#import "QBAssetCell.h"
+#import "QBVideoIndicatorView.h"
+
+// ViewControllers
+#import "BBQDynamicEditViewController.h"
+#import "CRMediaPickerController.h"
+#import "MJPhotoBrowser.h"
+#import "QBAlbumsViewController.h"
+#import "QBImagePickerController.h"
+#import <DateTools.h>
+#import "SetTableViewController.h"
+#import "BBQPublishManager.h"
+
+@interface QBImagePickerController (Private)
+
+@property(nonatomic, strong) ALAssetsLibrary *assetsLibrary;
+
+@end
+
+@interface QBAssetsViewController () <
+UICollectionViewDelegate, UICollectionViewDataSource,
+UICollectionViewDelegateFlowLayout, UINavigationControllerDelegate,
+UIImagePickerControllerDelegate, CRMediaPickerControllerDelegate>
+
+@property(weak, nonatomic) IBOutlet UICollectionView *collectionView;
+@property(nonatomic, copy) NSArray *assets;
+@property(nonatomic, copy) NSArray *assetsGroups;
+@property(nonatomic, assign) NSUInteger numberOfAssets;
+@property(nonatomic, assign) NSUInteger numberOfPhotos;
+@property(nonatomic, assign) NSUInteger numberOfVideos;
+@property (assign, nonatomic) NSTimeInterval maxTimeInterval;
+@property(nonatomic, assign) BOOL disableScrollToBottom;
+@property(nonatomic, strong) NSIndexPath *indexPathForLastVisibleItem;
+@property(nonatomic, strong) NSIndexPath *lastSelectedItemIndexPath;
+@property(weak, nonatomic) IBOutlet UIButton *nextButton;
+@property(nonatomic, strong) CRMediaPickerController *mediaPickerController;
+@property(weak, nonatomic) IBOutlet UIButton *previewButton;
+@property(assign, nonatomic) BOOL isBatch;
+
+@end
+
+@implementation QBAssetsViewController
+#pragma mark - Life Cycle
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    
+    self.edgesForExtendedLayout = UIRectEdgeNone;
+    
+    
+    self.parentViewController.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc] initWithTitle:@"选择相册" style:UIBarButtonItemStylePlain target:self action:@selector(chooseAlbum)];
+    
+    _isBatch = _imagePickerController.isBatch;
+    self.nextButton.layer.masksToBounds = YES;
+    self.nextButton.layer.cornerRadius = self.nextButton.height / 2.0;
+    if (_isBatch) {
+        [self.nextButton setTitle:@"发表" forState:UIControlStateNormal];
+    }
+    //    [self.nextButton setImage:[[UIImage imageWithColor:UIColorHex(ff6440)] resizableImageWithCapInsets:UIEdgeInsetsZero] forState:UIControlStateNormal];
+    [self.nextButton setBackgroundImage:[UIImage imageWithColor:UIColorHex(ff6440) size:self.nextButton.size] forState:UIControlStateNormal];
+    
+    [self updateAssetsGroupsWithCompletion:^{
+        self.assetsGroup = self.assetsGroups.firstObject;
+        if (_imagePickerController.filterType == QBImagePickerControllerFilterTypePhotos) {
+            self.parentViewController.navigationItem.title =
+            [self.assetsGroup valueForProperty:ALAssetsGroupPropertyName];
+        }
+    }];
+    // Register observer
+    [[NSNotificationCenter defaultCenter]
+     addObserver:self
+     selector:@selector(assetsLibraryChanged:)
+     name:ALAssetsLibraryChangedNotification
+     object:nil];
+    @weakify(self)
+    [_imagePickerController bk_addObserverForKeyPath:@"selectedAssetURLs" options:NSKeyValueObservingOptionInitial | NSKeyValueObservingOptionNew task:^(id obj, NSDictionary *change) {
+        @strongify(self)
+        self.previewButton.enabled =
+        _imagePickerController.selectedAssetURLs.count;
+        [self.previewButton setTitle:[NSString stringWithFormat:@"预览(%@/%@)", @(_imagePickerController.selectedAssetURLs.count), @(_imagePickerController.maximumNumberOfSelection)] forState:UIControlStateNormal];
+        self.nextButton.enabled = _imagePickerController.selectedAssetURLs.count;
+    }];
+}
+
+- (void)viewWillAppear:(BOOL)animated {
+    [super viewWillAppear:animated];
+    if (_imagePickerController.filterType == QBImagePickerControllerFilterTypePhotos) {
+        self.parentViewController.navigationItem.title =
+        [self.assetsGroup valueForProperty:ALAssetsGroupPropertyName];
+    } else if (_imagePickerController.filterType == QBImagePickerControllerFilterTypeVideos) {
+        self.previewButton.hidden = YES;
+        self.parentViewController.navigationItem.title = @"上传视频";
+    }
+    
+    if (_isBatch) {
+        self.parentViewController.navigationItem.title = @"批量上传";
+    }
+    
+    // Configure collection view
+    self.collectionView.allowsMultipleSelection =
+    self.imagePickerController.allowsMultipleSelection;
+    
+    //    // Scroll to bottom
+    //    if (self.numberOfAssets > 0 && self.isMovingToParentViewController &&
+    //        !self.disableScrollToBottom) {
+    //        NSIndexPath *indexPath =
+    //        [NSIndexPath indexPathForItem:(self.numberOfAssets - 1) inSection:0];
+    //        [self.collectionView
+    //         scrollToItemAtIndexPath:indexPath
+    //         atScrollPosition:UICollectionViewScrollPositionTop
+    //         animated:NO];
+    //    }
+}
+
+- (void)viewWillDisappear:(BOOL)animated {
+    [super viewWillDisappear:animated];
+    self.disableScrollToBottom = YES;
+}
+
+- (void)viewDidAppear:(BOOL)animated {
+    [super viewDidAppear:animated];
+    self.disableScrollToBottom = NO;
+}
+
+- (void)dealloc {
+    // Remove observer
+    [[NSNotificationCenter defaultCenter]
+     removeObserver:self
+     name:ALAssetsLibraryChangedNotification
+     object:nil];
+}
+
+- (BOOL)isAutoDeselectEnabled {
+    return (self.imagePickerController.maximumNumberOfSelection == 1 &&
+            self.imagePickerController.maximumNumberOfSelection >=
+            self.imagePickerController.minimumNumberOfSelection);
+}
+
+#pragma mark - Handling Assets Library Changes
+- (void)assetsLibraryChanged:(NSNotification *)notification {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [self updateAssetsGroupsWithCompletion:nil];
+        NSSet *updatedAssetsGroups =
+        notification.userInfo[ALAssetLibraryUpdatedAssetGroupsKey];
+        NSURL *assetsGroupURL =
+        [self.assetsGroup valueForProperty:ALAssetsGroupPropertyURL];
+        
+        for (NSURL *updatedAssetsGroupURL in updatedAssetsGroups) {
+            if ([updatedAssetsGroupURL isEqual:assetsGroupURL]) {
+                [self updateAssets];
+                [self.collectionView reloadData];
+            }
+        }
+    });
+}
+
+#pragma mark - Fetching Assets
+- (void)fetchAssetsGroupsWithTypes:(NSArray *)types
+                        completion:(void (^)(NSArray *assetsGroups))completion {
+    __block NSMutableArray *assetsGroups = [NSMutableArray array];
+    __block NSUInteger numberOfFinishedTypes = 0;
+    
+    ALAssetsLibrary *assetsLibrary = self.imagePickerController.assetsLibrary;
+    ALAssetsFilter *assetsFilter;
+    
+    switch (self.imagePickerController.filterType) {
+        case QBImagePickerControllerFilterTypeNone:
+            assetsFilter = [ALAssetsFilter allAssets];
+            break;
+            
+        case QBImagePickerControllerFilterTypePhotos:
+            assetsFilter = [ALAssetsFilter allPhotos];
+            break;
+            
+        case QBImagePickerControllerFilterTypeVideos:
+            assetsFilter = [ALAssetsFilter allVideos];
+            break;
+    }
+    
+    for (NSNumber *type in types) {
+        [assetsLibrary enumerateGroupsWithTypes:[type unsignedIntegerValue]
+                                     usingBlock:^(ALAssetsGroup *assetsGroup, BOOL *stop) {
+                                         if (assetsGroup) {
+                                             // Apply assets filter
+                                             [assetsGroup setAssetsFilter:assetsFilter];
+                                             
+                                             // Add assets group
+                                             [assetsGroups addObject:assetsGroup];
+                                         } else {
+                                             numberOfFinishedTypes++;
+                                         }
+                                         
+                                         // Check if the loading finished
+                                         if (numberOfFinishedTypes == types.count) {
+                                             if (completion) {
+                                                 completion(assetsGroups);
+                                             }
+                                         }
+                                     }
+                                   failureBlock:^(NSError *error) {
+                                       NSLog(@"Error: %@", [error localizedDescription]);
+                                   }];
+    }
+}
+
+- (void)updateAssetsGroupsWithCompletion:(void (^)(void))completion {
+    [self
+     fetchAssetsGroupsWithTypes:self.imagePickerController.groupTypes
+     completion:^(NSArray *assetsGroups) {
+         // Map assets group to dictionary
+         NSMutableDictionary *mappedAssetsGroups =
+         [NSMutableDictionary
+          dictionaryWithCapacity:assetsGroups.count];
+         for (ALAssetsGroup *assetsGroup in assetsGroups) {
+             NSMutableArray *array =
+             mappedAssetsGroups[[assetsGroup
+                                 valueForProperty:ALAssetsGroupPropertyType]];
+             if (!array) {
+                 array = [NSMutableArray array];
+             }
+             
+             [array addObject:assetsGroup];
+             
+             mappedAssetsGroups[[assetsGroup
+                                 valueForProperty:ALAssetsGroupPropertyType]] =
+             array;
+         }
+         
+         // Pick the groups to be shown
+         NSMutableArray *sortedAssetsGroups = [NSMutableArray
+                                               arrayWithCapacity:self.imagePickerController
+                                               .groupTypes.count];
+         
+         for (NSValue *groupType in self.imagePickerController
+              .groupTypes) {
+             NSArray *array = mappedAssetsGroups[groupType];
+             
+             if (array) {
+                 [sortedAssetsGroups addObjectsFromArray:array];
+             }
+         }
+         
+         self.assetsGroups = sortedAssetsGroups;
+         
+         if (completion) {
+             completion();
+         }
+     }];
+}
+
+#pragma mark - Actions
+- (IBAction)next:(id)sender {
+    [self fetchAssetsFromSelectedAssetURLsWithCompletion:^(NSArray *assets) {
+        if (_imagePickerController.dynamic && !_imagePickerController.dynamic.setDate) {
+            if (assets.count) {
+                _imagePickerController.dynamic.graphtime = @(self.maxTimeInterval);
+            } else {
+                _imagePickerController.dynamic.graphtime = @([[NSDate date] timeIntervalSince1970]);
+            }
+        }
+        
+        NSArray *attachments = [assets bk_map:^id(ALAsset *asset) {
+            Attachment *attachment = [Attachment attachmentWithAsset:asset dynamic:_imagePickerController.dynamic];
+            return attachment;
+        }];
+        
+        if ([_imagePickerController.delegate respondsToSelector:@selector(qb_imagePickerController:didSelectAttachments: selectedAssetURLs:)]) {
+            [_imagePickerController.delegate qb_imagePickerController:_imagePickerController didSelectAttachments:attachments selectedAssetURLs:_imagePickerController.selectedAssetURLs];
+        } else {
+            [_imagePickerController.dynamic.attachinfo addObjectsFromArray:attachments];
+            if (_isBatch) {
+                if (kNetworkStatus == AFNetworkReachabilityStatusReachableViaWiFi) {
+                    [self publish];
+                    return;
+                }
+                
+                if (kNetworkStatus == AFNetworkReachabilityStatusReachableViaWWAN && TheCurUser.needWarnWifi) {
+                    TheCurUser.netAlertCount++;
+                    @weakify(self)
+                    [UIAlertView bk_showAlertViewWithTitle:@"提示" message:@"您当前为移动数据传输，继续发表将消耗流量，是否需要设置仅在Wi-Fi环境下上传？" cancelButtonTitle:@"取消" otherButtonTitles:@[@"继续发表", @"去设置"] handler:^(UIAlertView *alertView, NSInteger buttonIndex) {
+                        @strongify(self)
+                        switch (buttonIndex) {
+                            case 1: {
+                                [self publish];
+                            } break;
+                            case 2: {
+                                UIStoryboard *sb = [UIStoryboard storyboardWithName:@"RootTabBar" bundle:nil];
+                                SetTableViewController *vc = [sb instantiateViewControllerWithIdentifier:@"settingup"];
+                                [self.navigationController pushViewController:vc animated:YES];
+                            } break;
+                            default:
+                                break;
+                        }
+                    }];
+                    return;
+                }
+                
+                [self publish];
+            } else {
+                UIStoryboard *sb = [UIStoryboard storyboardWithName:@"Dynamic" bundle:nil];
+                BBQDynamicEditViewController *vc =
+                [sb instantiateViewControllerWithIdentifier:@"DynamicEditVC"];
+                vc.dynamic = _imagePickerController.dynamic;
+                [self.navigationController setViewControllers:@[
+                                                                self.navigationController.viewControllers.firstObject,
+                                                                vc
+                                                                ]
+                                                     animated:YES];
+            }
+        }
+    }];
+}
+
+- (void)publish {
+    [[BBQPublishManager sharedManager] addDynamic:_imagePickerController.dynamic];
+    self.tabBarController.selectedIndex = 0;
+    [self.navigationController popToRootViewControllerAnimated:YES];
+}
+
+- (void)chooseAlbum {
+    UIStoryboard *sb =
+    [UIStoryboard storyboardWithName:@"QBImagePicker" bundle:nil];
+    QBAlbumsViewController *vc =
+    [sb instantiateViewControllerWithIdentifier:@"AlbumsViewController"];
+    vc.assetsGroups = self.assetsGroups;
+    @weakify(self)
+    vc.didSelectAlbumAtIndex = ^(NSInteger index) {
+        @strongify(self)
+        self.assetsGroup = self.assetsGroups[index];
+    };
+    [self.navigationController pushViewController:vc animated:YES];
+}
+
+- (IBAction)preview:(id)sender {
+    if (_imagePickerController.selectedAssetURLs.count) {
+        NSMutableArray *photos = [NSMutableArray array];
+        for (NSURL *url in _imagePickerController.selectedAssetURLs) {
+            MJPhoto *photo = [[MJPhoto alloc] init];
+            photo.url = url;
+            [photos addObject:photo];
+        }
+        MJPhotoBrowser *browser = [[MJPhotoBrowser alloc] init];
+        browser.photos = photos;
+        [browser show];
+    }
+}
+
+- (void)takePhotoOrVideo {
+    if (kiOS8Later) {
+        self.modalPresentationStyle = UIModalPresentationOverCurrentContext;
+    }
+    if (![AuthorizationHelper checkCameraAuthorizationStatus]) {
+        return;
+    }
+    if (_imagePickerController.filterType == QBImagePickerControllerFilterTypeVideos) {
+        self.mediaPickerController = [[CRMediaPickerController alloc] init];
+        self.mediaPickerController.delegate = self;
+        self.mediaPickerController.mediaType =
+        CRMediaPickerControllerMediaTypeVideo;
+        self.mediaPickerController.sourceType =
+        CRMediaPickerControllerSourceTypeCamera;
+        self.mediaPickerController.allowsEditing = YES;
+        self.mediaPickerController.cameraDevice =
+        UIImagePickerControllerCameraDeviceRear;
+        //视频时长
+        self.mediaPickerController.videoMaximumDuration = 59;
+        self.mediaPickerController.videoQualityType =
+        UIImagePickerControllerQualityTypeMedium;
+        [self.mediaPickerController show];
+    } else {
+        if ([self isMaximumSelectionLimitReached]) {
+            kTipAlert(@"最多只可选择9张照片，已经选满了。先去掉一张照片再拍照呗～");
+            return;
+        }
+        UIImagePickerController *picker = [[UIImagePickerController alloc] init];
+        picker.delegate = self;
+        picker.allowsEditing = NO; //设置不可编辑
+        picker.sourceType = UIImagePickerControllerSourceTypeCamera;
+        [self presentViewController:picker animated:YES completion:nil];
+    }
+}
+
+#pragma mark - Fetching Assets
+
+- (void)updateAssets {
+    NSMutableArray *assets = [NSMutableArray array];
+    __block NSUInteger numberOfAssets = 0;
+    __block NSUInteger numberOfPhotos = 0;
+    __block NSUInteger numberOfVideos = 0;
+    
+    NSArray *urls;
+    if ([_imagePickerController.delegate respondsToSelector:@selector(preSelectedAssetURLs)]) {
+        urls = [_imagePickerController.delegate preSelectedAssetURLs];
+    } else {
+        urls = _imagePickerController.dynamic.selectedAssetURLs;
+    }
+    
+    [self.assetsGroup
+     enumerateAssetsWithOptions:NSEnumerationReverse
+     usingBlock:^(ALAsset *result, NSUInteger index,
+                  BOOL *stop) {
+         if (result) {
+             NSString *type =
+             [result valueForProperty:ALAssetPropertyType];
+             NSURL *url = [result valueForProperty:ALAssetPropertyAssetURL];
+             if (![urls containsObject:url]) {
+                 if ([type isEqualToString:ALAssetTypePhoto]) {
+                     numberOfPhotos++;
+                     numberOfAssets++;
+                     [assets addObject:result];
+                 } else if ([type isEqualToString:ALAssetTypeVideo]) {
+                     NSTimeInterval duration = [[result
+                                                 valueForProperty:ALAssetPropertyDuration]
+                                                doubleValue];
+                     if (duration >= 3 && duration <= 61) {
+                         numberOfVideos++;
+                         numberOfAssets++;
+                         [assets addObject:result];
+                     }
+                 }
+             }
+         }
+     }];
+    self.assets = assets;
+    self.numberOfAssets = numberOfAssets;
+    self.numberOfPhotos = numberOfPhotos;
+    self.numberOfVideos = numberOfVideos;
+    if (!self.numberOfAssets) {
+        [self takePhotoOrVideo];
+    }
+}
+
+- (void)fetchAssetsFromSelectedAssetURLsWithCompletion:
+(void (^)(NSArray *assets))completion {
+    // Load assets from URLs
+    // The asset will be ignored if it is not found
+    ALAssetsLibrary *assetsLibrary = self.imagePickerController.assetsLibrary;
+    NSMutableArray *selectedAssetURLs =
+    self.imagePickerController.selectedAssetURLs;
+    
+    __block NSMutableArray *assets = [NSMutableArray array];
+    
+    void (^checkNumberOfAssets)(void) = ^{
+        if (assets.count == selectedAssetURLs.count) {
+            if (completion) {
+                completion([assets copy]);
+            }
+        }
+    };
+    
+    void (^checkMaxDate)(ALAsset *) = ^(ALAsset *asset) {
+        NSTimeInterval timeInteravl = [[asset valueForProperty:ALAssetPropertyDate] timeIntervalSince1970];
+        self.maxTimeInterval = MAX(self.maxTimeInterval, timeInteravl);
+    };
+    
+    for (NSURL *assetURL in selectedAssetURLs) {
+        [assetsLibrary assetForURL:assetURL
+                       resultBlock:^(ALAsset *asset) {
+                           if (asset) {
+                               // Add asset
+                               [assets addObject:asset];
+                               checkMaxDate(asset);
+                               checkNumberOfAssets();
+                           } else {
+                               [assetsLibrary enumerateGroupsWithTypes:ALAssetsGroupPhotoStream
+                                                            usingBlock:^(ALAssetsGroup *group, BOOL *stop) {
+                                                                [group enumerateAssetsWithOptions:NSEnumerationReverse
+                                                                                       usingBlock:^(ALAsset *result,
+                                                                                                    NSUInteger index,
+                                                                                                    BOOL *stop) {
+                                                                                           if ([result.defaultRepresentation.url
+                                                                                                isEqual:assetURL]) {
+                                                                                               [assets addObject:result];checkMaxDate(asset);                       // Check if the loading finished
+                                                                                               checkNumberOfAssets();
+                                                                                               *stop = YES;
+                                                                                           }
+                                                                                       }];
+                                                            }
+                                                          failureBlock:^(NSError *error) {
+                                                              NSLog(@"Error: %@", [error localizedDescription]);
+                                                          }];
+                           }
+                       }
+                      failureBlock:^(NSError *error) {
+                          NSLog(@"Error: %@", [error localizedDescription]);
+                      }];
+    }
+}
+
+#pragma mark - Checking for Selection Limit
+
+- (BOOL)isMinimumSelectionLimitFulfilled {
+    return (self.imagePickerController.minimumNumberOfSelection <=
+            self.imagePickerController.selectedAssetURLs.count);
+}
+
+- (BOOL)isMaximumSelectionLimitReached {
+    NSUInteger minimumNumberOfSelection =
+    MAX(1, self.imagePickerController.minimumNumberOfSelection);
+    
+    if (minimumNumberOfSelection <=
+        self.imagePickerController.maximumNumberOfSelection) {
+        return (self.imagePickerController.maximumNumberOfSelection <=
+                self.imagePickerController.selectedAssetURLs.count);
+    }
+    return NO;
+}
+
+#pragma mark - UICollectionViewDataSource
+- (NSInteger)collectionView:(UICollectionView *)collectionView
+     numberOfItemsInSection:(NSInteger)section {
+    return _isBatch ? self.numberOfAssets : self.numberOfAssets + 1;
+}
+
+- (UICollectionViewCell *)collectionView:(UICollectionView *)collectionView
+                  cellForItemAtIndexPath:(NSIndexPath *)indexPath {
+    QBAssetCell *cell =
+    [collectionView dequeueReusableCellWithReuseIdentifier:@"AssetCell"
+                                              forIndexPath:indexPath];
+    
+    if (!_isBatch && indexPath.item == 0) {
+        if (_imagePickerController.filterType == QBImagePickerControllerFilterTypePhotos) {
+            cell.imageView.image = [UIImage imageNamed:@"upload_photo"];
+        } else {
+            cell.imageView.image = [UIImage imageNamed:@"upload_video"];
+        }
+        cell.videoIndicatorView.hidden = YES;
+        cell.checkMarkView.hidden = YES;
+        cell.selected = NO;
+    } else {
+        cell.tag = _isBatch ? indexPath.item : indexPath.item - 1;
+        if (_imagePickerController.filterType == QBImagePickerControllerFilterTypeVideos) {
+            cell.checkMarkView.hidden = YES;
+        } else {
+            cell.checkMarkView.hidden = NO;
+        }
+        
+        // Image
+        ALAsset *asset =
+        self.assets[_isBatch ? indexPath.item : indexPath.item - 1];
+        UIImage *image = [UIImage imageWithCGImage:[asset thumbnail]];
+        cell.imageView.image = image;
+        // Video indicator
+        NSString *assetType = [asset valueForProperty:ALAssetPropertyType];
+        if ([assetType isEqualToString:ALAssetTypeVideo]) {
+            cell.videoIndicatorView.hidden = NO;
+            NSTimeInterval duration =
+            [[asset valueForProperty:ALAssetPropertyDuration] doubleValue];
+            NSInteger minutes = (NSInteger)(duration / 60.0);
+            NSInteger seconds = (NSInteger)ceil(duration - 60.0 * (double)minutes);
+            cell.videoIndicatorView.timeLabel.text = [NSString
+                                                      stringWithFormat:@"%02ld:%02ld", (long)minutes, (long)seconds];
+        } else {
+            cell.videoIndicatorView.hidden = YES;
+        }
+        
+        // Selection state
+        NSURL *assetURL = [asset valueForProperty:ALAssetPropertyAssetURL];
+        if ([self.imagePickerController.selectedAssetURLs
+             containsObject:assetURL]) {
+            cell.checkMarkView.hidden = NO;
+            cell.selected = YES;
+            [collectionView selectItemAtIndexPath:indexPath
+                                         animated:NO
+                                   scrollPosition:UICollectionViewScrollPositionNone];
+        }
+        
+        cell.usedIndicatorView.hidden = ![TheCurUser.usedMedia containsObject:assetURL.absoluteString];
+    }
+    return cell;
+}
+
+#pragma mark - UICollectionViewDelegate
+
+- (BOOL)collectionView:(UICollectionView *)collectionView
+shouldSelectItemAtIndexPath:(NSIndexPath *)indexPath {
+    if ([self.imagePickerController.delegate
+         respondsToSelector:@selector(qb_imagePickerController:
+                                      shouldSelectAsset:)]) {
+             ALAsset *asset =
+             self.assets[_isBatch ? indexPath.item : indexPath.item - 1];
+             return [self.imagePickerController.delegate
+                     qb_imagePickerController:self.imagePickerController
+                     shouldSelectAsset:asset];
+         }
+    
+    if ([self isAutoDeselectEnabled]) {
+        return YES;
+    }
+    
+    if ([self isMaximumSelectionLimitReached]) {
+        if (_isBatch) {
+            kTipAlert(@"最多只可选择50张照片～");
+        } else {
+            kTipAlert(@"最多只可选择9张照片～");
+        }
+    }
+    
+    return ![self isMaximumSelectionLimitReached];
+}
+
+- (void)collectionView:(UICollectionView *)collectionView
+didSelectItemAtIndexPath:(NSIndexPath *)indexPath {
+    if (!_isBatch && indexPath.item == 0) {
+        [self takePhotoOrVideo];
+    } else {
+        QBAssetCell *cell =
+        (QBAssetCell *)[collectionView cellForItemAtIndexPath:indexPath];
+        if (_imagePickerController.filterType == QBImagePickerControllerFilterTypeVideos) {
+            cell.checkMarkView.hidden = NO;
+        }
+        QBImagePickerController *imagePickerController = self.imagePickerController;
+        NSMutableArray *selectedAssetURLs =
+        imagePickerController.selectedAssetURLs;
+        
+        ALAsset *asset =
+        self.assets[_isBatch ? indexPath.item : indexPath.item - 1];
+        NSURL *assetURL = [asset valueForProperty:ALAssetPropertyAssetURL];
+        
+        if (imagePickerController.allowsMultipleSelection) {
+            if ([self isAutoDeselectEnabled] && selectedAssetURLs.count > 0) {
+                // Remove previous selected asset from set
+                [imagePickerController willChangeValueForKey:@"selectedAssetURLs"];
+                [selectedAssetURLs removeObjectAtIndex:0];
+                [imagePickerController didChangeValueForKey:@"selectedAssetURLs"];
+                
+                // Deselect previous selected asset
+                if (self.lastSelectedItemIndexPath) {
+                    [collectionView deselectItemAtIndexPath:self.lastSelectedItemIndexPath
+                                                   animated:NO];
+                }
+            }
+            
+            // Add asset to set
+            [imagePickerController willChangeValueForKey:@"selectedAssetURLs"];
+            [selectedAssetURLs addObject:assetURL];
+            [imagePickerController didChangeValueForKey:@"selectedAssetURLs"];
+            self.lastSelectedItemIndexPath = indexPath;
+        } else {
+            if ([imagePickerController.delegate
+                 respondsToSelector:@selector(qb_imagePickerController:
+                                              didSelectAsset:)]) {
+                     [imagePickerController.delegate
+                      qb_imagePickerController:imagePickerController
+                      didSelectAsset:asset];
+                 }
+            if ([selectedAssetURLs containsObject:assetURL]) {
+                [collectionView deselectItemAtIndexPath:indexPath animated:YES];
+                if (_imagePickerController.filterType == QBImagePickerControllerFilterTypeVideos) {
+                    cell.checkMarkView.hidden = YES;
+                }
+                [imagePickerController willChangeValueForKey:@"selectedAssetURLs"];
+                [selectedAssetURLs removeObjectAtIndex:0];
+                [imagePickerController didChangeValueForKey:@"selectedAssetURLs"];
+            } else {
+                [imagePickerController willChangeValueForKey:@"selectedAssetURLs"];
+                [selectedAssetURLs removeAllObjects];
+                [selectedAssetURLs addObject:assetURL];
+                [imagePickerController didChangeValueForKey:@"selectedAssetURLs"];
+            }
+        }
+    }
+}
+
+- (void)collectionView:(UICollectionView *)collectionView
+didDeselectItemAtIndexPath:(NSIndexPath *)indexPath {
+    if (!_isBatch && indexPath.item == 0)
+        return;
+    QBAssetCell *cell =
+    (QBAssetCell *)[collectionView cellForItemAtIndexPath:indexPath];
+    if (_imagePickerController.filterType == QBImagePickerControllerFilterTypeVideos) {
+        cell.checkMarkView.hidden = YES;
+    }
+    if (!self.imagePickerController.allowsMultipleSelection) {
+        return;
+    }
+    
+    QBImagePickerController *imagePickerController = self.imagePickerController;
+    NSMutableArray *selectedAssetURLs =
+    imagePickerController.selectedAssetURLs;
+    
+    // Remove asset from set
+    ALAsset *asset = self.assets[_isBatch ? indexPath.item : indexPath.item - 1];
+    NSURL *assetURL = [asset valueForProperty:ALAssetPropertyAssetURL];
+    
+    [imagePickerController willChangeValueForKey:@"selectedAssetURLs"];
+    [selectedAssetURLs removeObject:assetURL];
+    [imagePickerController didChangeValueForKey:@"selectedAssetURLs"];
+    
+    self.lastSelectedItemIndexPath = nil;
+}
+
+#pragma mark - UICollectionViewDelegateFlowLayout
+- (CGSize)collectionView:(UICollectionView *)collectionView
+                  layout:(UICollectionViewLayout *)collectionViewLayout
+  sizeForItemAtIndexPath:(NSIndexPath *)indexPath {
+    NSUInteger numberOfColumns;
+    if (UIInterfaceOrientationIsPortrait(
+                                         [[UIApplication sharedApplication] statusBarOrientation])) {
+        numberOfColumns = self.imagePickerController.numberOfColumnsInPortrait;
+    } else {
+        numberOfColumns = self.imagePickerController.numberOfColumnsInLandscape;
+    }
+    CGFloat width =
+    (kScreenWidth - 15 * 2 - 7.5 * (numberOfColumns - 1)) / numberOfColumns;
+    return CGSizeMake(width, width);
+}
+
+#pragma mark - UIImagePickerControllerDelegate
+- (void)imagePickerController:(UIImagePickerController *)picker
+didFinishPickingMediaWithInfo:(NSDictionary *)info {
+    UIImage *pickerImage =
+    [info objectForKey:UIImagePickerControllerOriginalImage];
+    
+    ALAssetsLibrary *assetsLibrary = [[ALAssetsLibrary alloc] init];
+    @weakify(self)
+    [assetsLibrary
+     writeImageToSavedPhotosAlbum:[pickerImage CGImage]
+     orientation:(ALAssetOrientation)
+     pickerImage.imageOrientation
+     completionBlock:^(NSURL *assetURL, NSError *error) {
+         @strongify(self)
+         QBImagePickerController *imagePickerController = self.imagePickerController;
+         NSMutableArray *selectedAssetURLs =
+         imagePickerController.selectedAssetURLs;
+         [imagePickerController willChangeValueForKey:@"selectedAssetURLs"];
+         [selectedAssetURLs addObject:assetURL];
+         [imagePickerController didChangeValueForKey:@"selectedAssetURLs"];
+         [self.collectionView reloadData];
+     }];
+    [picker dismissViewControllerAnimated:YES completion:nil];
+}
+
+- (void)imagePickerControllerDidCancel:(UIImagePickerController *)picker {
+    [picker dismissViewControllerAnimated:YES completion:nil];
+}
+
+- (void)CRMediaPickerController:(CRMediaPickerController *)mediaPickerController
+          didFinishPickingAsset:(ALAsset *)asset
+                          error:(NSError *)error {
+    QBImagePickerController *imagePickerController = self.imagePickerController;
+    NSMutableArray *selectedAssetURLs =
+    imagePickerController.selectedAssetURLs;
+    [imagePickerController willChangeValueForKey:@"selectedAssetURLs"];
+    [selectedAssetURLs removeAllObjects];
+    [selectedAssetURLs addObject:[asset valueForProperty:ALAssetPropertyAssetURL]];
+    [imagePickerController didChangeValueForKey:@"selectedAssetURLs"];
+    [self.collectionView reloadData];
+}
+
+- (void)CRMediaPickerControllerDidCancel:
+(CRMediaPickerController *)mediaPickerController {
+    [self.mediaPickerController dismiss];
+}
+
+#pragma mark - Getter & Setter
+- (void)setAssetsGroup:(ALAssetsGroup *)assetsGroup {
+    _assetsGroup = assetsGroup;
+    [self updateAssets];
+    if ([self isAutoDeselectEnabled] &&
+        self.imagePickerController.selectedAssetURLs.count > 0) {
+        // Get index of previous selected asset
+        NSURL *previousSelectedAssetURL =
+        [self.imagePickerController.selectedAssetURLs firstObject];
+        
+        [self.assets enumerateObjectsUsingBlock:^(ALAsset *asset, NSUInteger index,
+                                                  BOOL *stop) {
+            NSURL *assetURL = [asset valueForProperty:ALAssetPropertyAssetURL];
+            if ([assetURL isEqual:previousSelectedAssetURL]) {
+                self.lastSelectedItemIndexPath =
+                [NSIndexPath indexPathForItem:index inSection:0];
+                *stop = YES;
+            }
+        }];
+    }
+    [self.collectionView reloadData];
+}
+
+@end

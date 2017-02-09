@@ -1,0 +1,182 @@
+//
+//  CardPreviewController.m
+//  BBQ
+//
+//  Created by wth on 15/10/14.
+//  Copyright © 2015年 bbq. All rights reserved.
+//
+
+#import "CardPreviewController.h"
+#import "ShareView.h"
+#import "LoadingView.h"
+#import "NoPhotoRemindViewController.h"
+#import <Masonry.h>
+
+@interface CardPreviewController () <UIWebViewDelegate>
+
+@property(weak, nonatomic) IBOutlet UIWebView *CardPreviewWebView;
+
+//转圈提示
+@property(strong, nonatomic) LoadingView *loadingView;
+
+//是否有动态
+@property(assign,nonatomic)BOOL shouldUpDynamic;
+
+@end
+
+@implementation CardPreviewController
+
+- (void)viewDidLoad {
+  [super viewDidLoad];
+  // Do any additional setup after loading the view.
+
+  self.CardPreviewWebView.delegate = self;
+
+  //加右侧分享按钮
+  UIBarButtonItem *rightButton = [[UIBarButtonItem alloc]
+      initWithImage:[UIImage imageNamed:@"fenxiangbaise.png"]
+              style:UIBarButtonItemStylePlain
+             target:self
+             action:@selector(RightBtnClick)];
+//  rightButton.imageInsets = UIEdgeInsetsMake(7, 11, 7, 3);
+      self.navigationItem.rightBarButtonItem=rightButton;
+
+  //加载数据转圈
+  self.loadingView =
+      [[NSBundle mainBundle] loadNibNamed:@"LoadingView" owner:self options:nil]
+          .firstObject;
+  self.loadingView.backgroundColor = [UIColor clearColor];
+  [self.CardPreviewWebView addSubview:self.loadingView];
+
+  //分入口
+  if ([self.accessType isEqualToString:@"从动态进入"]) {
+
+    [self RequestCZSUrl];
+  } else {
+
+    if ([self.CZS_dic[@"viewurl"] isEqualToString:@""]) {
+
+      //没动态就加上传提示
+      [self setNoPhotoRemindVcl];
+        self.shouldUpDynamic=YES;
+    } else {
+
+      [self RequestCZS_web];
+    }
+  }
+}
+
+- (void)viewWillDisappear:(BOOL)animated {
+    [super viewWillDisappear:animated];
+    [[ShareView sharedInstance] dismiss];
+}
+
+//请求成长书URL
+- (void)RequestCZSUrl {
+
+#ifdef TARGET_PARENT
+    
+    NSDictionary *ParamDic = @{ @"baobaouid" : TheCurBaoBao.uid,@"dtype":@"1" };
+#elif TARGET_TEACHER
+    
+    NSDictionary *ParamDic = @{ @"baobaouid" : TheCurUser.curClass.classid,@"dtype":@"2" };
+#elif TARGET_MASTER
+    
+    NSDictionary *ParamDic = @{ @"baobaouid" : TheCurUser.curSchool.schoolid,@"dtype":@"3" };
+#endif
+
+  [BBQHTTPRequest queryWithType:BBQHTTPRequestTypeCZSyulan
+      param:ParamDic
+      successHandler:^(AFHTTPRequestOperation *operation,
+                       NSDictionary *responseObject, bool apiSuccess) {
+
+        //转圈消失
+        [self.loadingView dismiss];
+
+        NSLog(@".....请求数据。。。%@", responseObject[@"data"]);
+
+        if ([responseObject[@"data"][@"havdynamic"] intValue] == 1) {
+
+          self.CZS_dic = responseObject[@"data"][@"urlarr"][0];
+          [self RequestCZS_web];
+        } else {
+
+          //没动态就加上传提示
+          [self setNoPhotoRemindVcl];
+            self.shouldUpDynamic=YES;
+        }
+
+      }
+      errorHandler:^(NSDictionary *responseObject) {
+
+        //转圈消失
+        [self.loadingView dismiss];
+        NSLog(@"。。。错误结果。。。%@", responseObject[@"msg"]);
+      }
+      failureHandler:^(AFHTTPRequestOperation *operation, NSError *error) {
+
+        //转圈消失
+        [self.loadingView dismiss];
+        NSLog(@"。。。网络失败结果。。。%@", error);
+      }];
+}
+
+- (void)RequestCZS_web {
+
+  NSURLRequest *UrlRequest = [NSURLRequest
+      requestWithURL:[NSURL URLWithString:self.CZS_dic[@"viewurl"]]];
+  NSLog(@"url地址：%@", self.CZS_dic[@"viewurl"]);
+  [self.CardPreviewWebView loadRequest:UrlRequest];
+}
+
+//分享按钮事件
+- (void)RightBtnClick {
+    if (self.shouldUpDynamic==YES) {
+        [SVProgressHUD showInfoWithStatus:@"上传照片后，即可分享动态"];
+        return;
+    }
+  ShareView *shareView = [ShareView sharedInstance];
+  shareView.shareType = BBQShareTypeCZS;
+  shareView.shareURL = self.CZS_dic[@"shareurl"];
+  shareView.shareTitle = self.CZS_dic[@"sharetitle"];
+  shareView.shareContent = self.CZS_dic[@"sharecontent"];
+  [shareView showShareView];
+}
+
+//设置无照片空白页
+- (void)setNoPhotoRemindVcl {
+  //没有照片提示页面
+  NoPhotoRemindViewController *NoPhotoRemindVcl =
+      [[UIStoryboard storyboardWithName:@"RootTabBar" bundle:nil]
+          instantiateViewControllerWithIdentifier:@"NoPhotoRemindVcl"];
+  [self addChildViewController:NoPhotoRemindVcl];
+  [self.view addSubview:NoPhotoRemindVcl.view];
+  [NoPhotoRemindVcl.view mas_makeConstraints:^(MASConstraintMaker *make) {
+    make.edges.equalTo(self.view);
+  }];
+  [self.view bringSubviewToFront:NoPhotoRemindVcl.view];
+}
+
+//网页加载完成代理
+- (void)webViewDidFinishLoad:(UIWebView *)webView {
+
+  //转圈消失
+  [self.loadingView dismiss];
+}
+- (void)didReceiveMemoryWarning {
+  [super didReceiveMemoryWarning];
+  // Dispose of any resources that can be recreated.
+}
+
+/*
+#pragma mark - Navigation
+
+// In a storyboard-based application, you will often want to do a little
+preparation before navigation
+- (void)prepareForSegue:(UIStoryboardSegue *)segue sender:(id)sender {
+    // Get the new view controller using [segue destinationViewController].
+    // Pass the selected object to the new view controller.
+}
+*/
+
+@end

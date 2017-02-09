@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.XIB" version="3.0" toolsVersion="9059" systemVersion="15B42" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES">
+    <dependencies>
+        <deployment identifier="iOS"/>
+        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="9049"/>
+        <capability name="Aspect ratio constraints" minToolsVersion="5.1"/>
+        <capability name="Constraints with non-1.0 multipliers" minToolsVersion="5.1"/>
+    </dependencies>
+    <objects>
+        <placeholder placeholderIdentifier="IBFilesOwner" id="-1" userLabel="File's Owner"/>
+        <placeholder placeholderIdentifier="IBFirstResponder" id="-2" customClass="UIResponder"/>
+        <view contentMode="scaleToFill" id="iN0-l3-epB" customClass="SwitchBabyButton">
+            <rect key="frame" x="0.0" y="0.0" width="320" height="568"/>
+            <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+            <subviews>
+                <button contentMode="scaleToFill" misplaced="YES" contentHorizontalAlignment="center" contentVerticalAlignment="center" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="otK-SD-MjR">
+                    <rect key="frame" x="0.0" y="243" width="320" height="82"/>
+                    <animations/>
+                    <rect key="contentStretch" x="0.40000000000000002" y="0.0" width="0.10000000000000001" height="1"/>
+                    <state key="normal" backgroundImage="switch_baby_unselected.png"/>
+                    <state key="selected" backgroundImage="switch_baby_selected.png"/>
+                </button>
+                <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" misplaced="YES" text="Label" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" preferredMaxLayoutWidth="0.0" translatesAutoresizingMaskIntoConstraints="NO" id="j1t-UJ-c0c">
+                    <rect key="frame" x="89" y="250" width="35.5" height="14"/>
+                    <animations/>
+                    <constraints>
+                        <constraint firstAttribute="height" constant="14" id="WMk-Vi-Ssw"/>
+                    </constraints>
+                    <fontDescription key="fontDescription" type="system" pointSize="14"/>
+                    <color key="textColor" red="0.20000000000000001" green="0.20000000000000001" blue="0.20000000000000001" alpha="1" colorSpace="calibratedRGB"/>
+                    <nil key="highlightedColor"/>
+                </label>
+                <imageView userInteractionEnabled="NO" contentMode="scaleToFill" horizontalHuggingPriority="251" verticalHuggingPriority="251" misplaced="YES" image="placeholder_panda.png" translatesAutoresizingMaskIntoConstraints="NO" id="eNW-SU-GnA">
+                    <rect key="frame" x="5" y="247" width="74" height="74"/>
+                    <animations/>
+                    <constraints>
+                        <constraint firstAttribute="width" secondItem="eNW-SU-GnA" secondAttribute="height" id="S0E-UR-hbj"/>
+                    </constraints>
+                </imageView>
+                <button opaque="NO" contentMode="scaleToFill" misplaced="YES" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="roundedRect" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="2ab-PT-Eyn">
+                    <rect key="frame" x="238" y="243" width="82" height="82"/>
+                    <animations/>
+                    <constraints>
+                        <constraint firstAttribute="width" secondItem="2ab-PT-Eyn" secondAttribute="height" id="wgf-Qj-q8s"/>
+                    </constraints>
+                    <state key="normal">
+                        <color key="titleShadowColor" white="0.5" alpha="1" colorSpace="calibratedWhite"/>
+                    </state>
+                </button>
+                <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" misplaced="YES" text="Label" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" preferredMaxLayoutWidth="0.0" translatesAutoresizingMaskIntoConstraints="NO" id="Y8g-zS-Ph5">
+                    <rect key="frame" x="89" y="306" width="31" height="12"/>
+                    <animations/>
+                    <constraints>
+                        <constraint firstAttribute="height" constant="12" id="vxH-PH-ebX"/>
+                    </constraints>
+                    <fontDescription key="fontDescription" type="system" pointSize="12"/>
+                    <color key="textColor" red="0.59999999999999998" green="0.59999999999999998" blue="0.59999999999999998" alpha="1" colorSpace="calibratedRGB"/>
+                    <nil key="highlightedColor"/>
+                </label>
+            </subviews>
+            <animations/>
+            <constraints>
+                <constraint firstItem="2ab-PT-Eyn" firstAttribute="trailing" secondItem="otK-SD-MjR" secondAttribute="trailing" id="C4A-Fu-JAr"/>
+                <constraint firstItem="otK-SD-MjR" firstAttribute="leading" secondItem="iN0-l3-epB" secondAttribute="leading" id="TwP-wG-Erk"/>
+                <constraint firstItem="Y8g-zS-Ph5" firstAttribute="bottom" secondItem="eNW-SU-GnA" secondAttribute="bottom" constant="-3" id="U8J-lE-3YP"/>
+                <constraint firstItem="otK-SD-MjR" firstAttribute="top" secondItem="iN0-l3-epB" secondAttribute="top" id="V76-ao-Oao"/>
+                <constraint firstItem="eNW-SU-GnA" firstAttribute="leading" secondItem="otK-SD-MjR" secondAttribute="leading" constant="5" id="Wyd-uR-hGz"/>
+                <constraint firstItem="2ab-PT-Eyn" firstAttribute="height" secondItem="otK-SD-MjR" secondAttribute="height" id="YuZ-re-Ft6"/>
+                <constraint firstItem="j1t-UJ-c0c" firstAttribute="top" secondItem="eNW-SU-GnA" secondAttribute="top" constant="3" id="a2A-UV-XSg"/>
+                <constraint firstAttribute="trailing" secondItem="otK-SD-MjR" secondAttribute="trailing" id="hod-T5-9IZ"/>
+                <constraint firstAttribute="bottom" secondItem="otK-SD-MjR" secondAttribute="bottom" id="kd3-S6-Iu5"/>
+                <constraint firstItem="2ab-PT-Eyn" firstAttribute="top" secondItem="otK-SD-MjR" secondAttribute="top" id="lHZ-ci-9Sd"/>
+                <constraint firstItem="j1t-UJ-c0c" firstAttribute="leading" secondItem="eNW-SU-GnA" secondAttribute="trailing" constant="10" id="ptn-8U-j6J"/>
+                <constraint firstItem="eNW-SU-GnA" firstAttribute="height" secondItem="otK-SD-MjR" secondAttribute="height" multiplier="0.9" id="rbo-pS-i20"/>
+                <constraint firstItem="Y8g-zS-Ph5" firstAttribute="leading" secondItem="j1t-UJ-c0c" secondAttribute="leading" id="s0J-bU-h96"/>
+                <constraint firstItem="eNW-SU-GnA" firstAttribute="centerY" secondItem="otK-SD-MjR" secondAttribute="centerY" id="zuC-Ud-8Kv"/>
+            </constraints>
+            <connections>
+                <outlet property="babyAgeLabel" destination="Y8g-zS-Ph5" id="aQM-zY-Amd"/>
+                <outlet property="babyBgButton" destination="otK-SD-MjR" id="XJp-Yy-5Eq"/>
+                <outlet property="babyHeadView" destination="eNW-SU-GnA" id="GTS-OK-Ssq"/>
+                <outlet property="babyNameLabel" destination="j1t-UJ-c0c" id="Dgi-0L-nDk"/>
+                <outlet property="checkBabyButton" destination="2ab-PT-Eyn" id="EuK-bv-Aon"/>
+            </connections>
+            <point key="canvasLocation" x="658" y="131"/>
+        </view>
+    </objects>
+    <resources>
+        <image name="placeholder_panda.png" width="85" height="85"/>
+        <image name="switch_baby_selected.png" width="195" height="50"/>
+        <image name="switch_baby_unselected.png" width="195" height="50"/>
+    </resources>
+</document>

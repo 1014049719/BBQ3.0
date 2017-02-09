@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.XIB" version="3.0" toolsVersion="9531" systemVersion="15C50" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES">
+    <dependencies>
+        <deployment identifier="iOS"/>
+        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="9529"/>
+        <capability name="Aspect ratio constraints" minToolsVersion="5.1"/>
+        <capability name="Constraints with non-1.0 multipliers" minToolsVersion="5.1"/>
+    </dependencies>
+    <objects>
+        <placeholder placeholderIdentifier="IBFilesOwner" id="-1" userLabel="File's Owner"/>
+        <placeholder placeholderIdentifier="IBFirstResponder" id="-2" customClass="UIResponder"/>
+        <view contentMode="scaleToFill" id="iN0-l3-epB" customClass="BBQLoadingView">
+            <rect key="frame" x="0.0" y="0.0" width="320" height="568"/>
+            <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+            <subviews>
+                <imageView userInteractionEnabled="NO" contentMode="scaleToFill" horizontalHuggingPriority="251" verticalHuggingPriority="251" image="logo_name" translatesAutoresizingMaskIntoConstraints="NO" id="OpW-TB-h2h">
+                    <rect key="frame" x="113" y="272" width="94" height="23.5"/>
+                    <color key="tintColor" red="0.8666666666666667" green="0.8666666666666667" blue="0.8666666666666667" alpha="1" colorSpace="calibratedRGB"/>
+                    <constraints>
+                        <constraint firstAttribute="width" secondItem="OpW-TB-h2h" secondAttribute="height" multiplier="4" id="0f9-FU-R4r"/>
+                    </constraints>
+                </imageView>
+                <view contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="6x0-Nz-9Nc" customClass="BBQSpinnerView">
+                    <rect key="frame" x="87" y="274" width="19" height="19"/>
+                    <constraints>
+                        <constraint firstAttribute="width" secondItem="6x0-Nz-9Nc" secondAttribute="height" id="c4P-1a-ETX"/>
+                    </constraints>
+                </view>
+            </subviews>
+            <color key="backgroundColor" red="0.96078431372549022" green="0.96078431372549022" blue="0.96078431372549022" alpha="1" colorSpace="calibratedRGB"/>
+            <constraints>
+                <constraint firstItem="OpW-TB-h2h" firstAttribute="leading" secondItem="6x0-Nz-9Nc" secondAttribute="trailing" constant="7" id="1Mx-me-yV7"/>
+                <constraint firstItem="OpW-TB-h2h" firstAttribute="centerY" secondItem="iN0-l3-epB" secondAttribute="centerY" id="4cM-ro-fhP"/>
+                <constraint firstItem="6x0-Nz-9Nc" firstAttribute="height" secondItem="OpW-TB-h2h" secondAttribute="height" multiplier="0.8" id="JP9-ds-lbb"/>
+                <constraint firstItem="OpW-TB-h2h" firstAttribute="centerX" secondItem="iN0-l3-epB" secondAttribute="centerX" id="l7E-yh-PY3"/>
+                <constraint firstItem="6x0-Nz-9Nc" firstAttribute="centerY" secondItem="OpW-TB-h2h" secondAttribute="centerY" id="nLe-IA-WGA"/>
+                <constraint firstItem="OpW-TB-h2h" firstAttribute="width" secondItem="iN0-l3-epB" secondAttribute="width" multiplier="110:375" id="qsG-We-l47"/>
+            </constraints>
+            <connections>
+                <outlet property="spinner" destination="6x0-Nz-9Nc" id="RPC-r1-30f"/>
+            </connections>
+            <point key="canvasLocation" x="199" y="252"/>
+        </view>
+    </objects>
+    <resources>
+        <image name="logo_name" width="110" height="27"/>
+    </resources>
+</document>

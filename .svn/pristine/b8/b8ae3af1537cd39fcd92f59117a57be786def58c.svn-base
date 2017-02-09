@@ -1,0 +1,349 @@
+//
+//  BBQHTTPRequest.m
+//  BBQ
+//
+//  Created by anymuse on 15/8/7.
+//  Copyright © 2015年 bbq. All rights reserved.
+//
+
+#import "BBQHTTPRequest.h"
+#import <SBJson4Writer.h>
+
+@implementation BBQHTTPRequest
+
++ (void)queryWithType:(BBQHTTPRequestType)requestType
+                        param:(NSDictionary *)param
+    constructingBodyWithBlock:(void (^)(id<AFMultipartFormData> formData))block
+               successHandler:(void (^)(AFHTTPRequestOperation *,
+                                        NSDictionary *, bool))success
+                 errorHandler:(void (^)(NSDictionary *responseObject))error
+               failureHandler:(void (^)(AFHTTPRequestOperation *,
+                                        NSError *))failure
+               successMessage:(NSString *)successMessage
+                 errorMessage:(NSString *)errorMessage {
+
+  //    if (kNetworkNotReachability) {
+  //        [SVProgressHUD showErrorWithStatus:@"请检查网络连接"];
+  //        return;
+  //    }
+
+  SBJson4Writer *writer = [[SBJson4Writer alloc] init];
+  NSDictionary *paraDic = [NSDictionary
+      dictionaryWithObjectsAndKeys:[writer stringWithObject:param], @"para",
+                                   nil];
+
+  NSString *URL = [self URLWithType:requestType];
+
+  [AFNetworkingHelper executePostWithUrl:URL
+                           andParameters:paraDic
+                              andHeaders:nil
+               constructingBodyWithBlock:block
+                      withSuccessHandler:success
+                        withErrorHandler:error
+                      withFailureHandler:failure
+                       withLoadingViewOn:nil];
+}
+
++ (void)queryWithType:(BBQHTTPRequestType)requestType
+                param:(NSDictionary *)param
+       successHandler:(void (^)(AFHTTPRequestOperation *, NSDictionary *,
+                                bool))success
+         errorHandler:(void (^)(NSDictionary *))error
+       failureHandler:(void (^)(AFHTTPRequestOperation *, NSError *))failure {
+  SBJson4Writer *writer = [[SBJson4Writer alloc] init];
+  NSDictionary *paraDic = [NSDictionary
+      dictionaryWithObjectsAndKeys:[writer stringWithObject:param], @"para",
+                                   nil];
+
+    
+  NSString *URL = [self URLWithType:requestType];
+  [AFNetworkingHelper executePostWithUrl:URL
+                           andParameters:paraDic
+                              andHeaders:nil
+                      withSuccessHandler:success
+                        withErrorHandler:error
+                      withFailureHandler:failure
+                       withLoadingViewOn:nil];
+}
+
++ (NSString *)URLWithType:(BBQHTTPRequestType)requestType {
+    NSString *appendString = nil;
+    switch (requestType) {
+        case BBQHTTPRequestTypeAddComment: {
+            appendString = URL_ADD_COMMENT;
+        } break;
+        case BBQHTTPRequestTypeAddDynamic: {
+            appendString = URL_UPLOAD_DYNA;
+        } break;
+        case BBQHTTPRequestTypeChangePassword: {
+            appendString = URL_UPDATE_PASSWORD;
+        } break;
+        case BBQHTTPRequestTypeChangePasswordWithVerifyCode: {
+            appendString = URL_UPDATE_PASSWORD_BY_YZCODE;
+        } break;
+        case BBQHTTPRequestTypeDeleteComment: {
+            appendString = URL_DELETE_COMMENT;
+        } break;
+        case BBQHTTPRequestTypeDeleteDynamic: {
+            appendString = URL_DELETE_DYNA;
+        } break;
+        case BBQHTTPRequestTypeGetDynamic: {
+            appendString = URL_QUERY_DYNA;
+        } break;
+        case BBQHTTPRequestTypeGetInviteCode: {
+            appendString = URL_GET_INVITE_CODE;
+        } break;
+        case BBQHTTPRequestTypeGetSMSVerifyCode: {
+            appendString = URL_GET_VERIFY_CODE;
+        } break;
+        case BBQHTTPRequestTypeGetSpecifyDynamic: {
+            appendString = URL_QUERY_SPECIFY_DYNA;
+        } break;
+        case BBQHTTPRequestTypeGetSpecifyDynamicComment: {
+            appendString = URL_QUERY_COMMENT;
+        } break;
+        case BBQHTTPRequestTypeLogout: {
+            appendString = URL_EXIT_LOGIN;
+        } break;
+        case BBQHTTPRequestTypeModifyInfo: {
+            appendString = URL_UPDATE_PERSON_INFO;
+        } break;
+        case BBQHTTPRequestTypeModifyRelationship: {
+            appendString = URL_UPDATE_RELATION;
+        } break;
+        case BBQHTTPRequestTypeRegist: {
+            appendString = URL_REGISTER;
+        } break;
+        case BBQHTTPRequestTypeSendInviteCode: {
+            appendString = URL_SEND_INVITECODE;
+        } break;
+        case BBQHTTPRequestTypeShareDynamic: {
+            appendString = URL_SHARE_DYNA;
+        } break;
+        case BBQHTTPRequestTypeUploadAvartar: {
+            appendString = URL_UPLOAD_AVATAR;
+        } break;
+        case BBQHTTPRequestTypeVerifyInviteCode: {
+            appendString = URL_REQUEST_CODE;
+        } break;
+            
+        case BBQHTTPRequestTypeGetMessageList: {
+            appendString = URL_GET_MESSAGE_LIST;
+        } break;
+            
+        case BBQHTTPRequestTypePostUserProblem: {
+            appendString = URL_POST_USERPROBLEM;
+        } break;
+            
+        case BBQHTTPRequestTypeGetRelativeList: {
+            appendString = URL_GET_RELATIVE_LIST;
+        } break;
+            
+        case BBQHTTPRequestTypeGetUserData: {
+            appendString = URL_GET_USER_DATA;
+        } break;
+            
+        case BBQHTTPRequestTypeGetBaoBaoList: {
+            appendString = URL_GET_BAOBAO_LIST;
+        } break;
+            
+        case BBQHTTPRequestTypeGetGoodsLocation: {
+            appendString = URL_GET_GOODS_LOCATION;
+        } break;
+            
+        case BBQHTTPRequestTypeAddNewGoodsLocation: {
+            appendString = URL_ADD_NEW_GOODS_LOCATION;
+        } break;
+            
+        case BBQHTTPRequestTypeModifyGoodsLocation: {
+            appendString = URL_MODIFY_GOODS_LOCATION;
+        } break;
+            
+        case BBQHTTPRequestTypeGetAllGiftData: {
+            appendString = URL_GET_ALL_GIFT_DATA;
+        } break;
+            
+        case BBQHTTPRequestTypeGetJiFenGiftData: {
+            appendString = URL_GET_JIFEN_GIFT_DATA;
+        } break;
+            
+        case BBQHTTPRequestTypeGetGiverRecord: {
+            appendString = URL_GET_GIVER_RECORD;
+        } break;
+            
+        case BBQHTTPRequestTypeExchangeGift: {
+            appendString = URL_EXCHANGE_GIFT;
+        } break;
+            
+        case BBQHTTPRequestTypePhotoRemind: {
+            appendString = URL_PHOTO_REMIND;
+        } break;
+            
+        case BBQHTTPRequestTypeDailyReport: {
+            appendString = URL_DAILY_REPORT;
+        } break;
+            
+        case BBQHTTPRequestTypeBabyDailyReportByMonth: {
+            appendString = URL_DAILY_REPORT_MONTH_DATA;
+        } break;
+            
+        case BBQHTTPRequestTypeClassDailyReportMonthData: {
+            appendString = URL_DAILY_REPORT_MONTH_DATA;
+        } break;
+            
+        case BBQHTTPRequestTypeGetClassList: {
+            appendString = URL_GET_CLASS_LIST;
+        } break;
+            
+        case BBQHTTPRequestTypeGetHelpList: {
+            appendString = URL_GET_HELP_LIST;
+        } break;
+            
+        case BBQHTTPRequestTypeDeleteFriend: {
+            appendString = URL_DELETE_RELATIVE;
+        } break;
+            
+        case BBQHTTPRequestTypeUpdateFriendData: {
+            appendString = URL_UPDATE_RELATION_INFO;
+        } break;
+            
+        case BBQHTTPRequestTypeGetJiFenDetail: {
+            appendString = URL_GET_JIFEN_DETAIL;
+        } break;
+            
+        case BBQHTTPRequestTypeGetLeDouHistory: {
+            appendString = URL_GET_LEDOU_HISTORY;
+        } break;
+            
+        case BBQHTTPRequestTypeGetRemindTaskNum: {
+            appendString = URL_GET_REMIND_NUM;
+        } break;
+        case BBQHTTPRequestTypeGetCurrentDayShuaKaNum: {
+            appendString = URL_GET_KAOQIN_NUM;
+        } break;
+        case BBQHTTPRequestTypeSendVerifyCode: {
+            appendString = URL_SEND_VERIFYCODE;
+        } break;
+        case BBQHTTPRequestTypeUpdateBabyInfo: {
+            appendString = URL_UPDATE_BABY_INFO;
+        } break;
+        case BBQHTTPRequestTypeLogin: {
+            appendString = URL_LOGIN;
+        } break;
+        case BBQHTTPRequestTypeBuyLedou: {
+            appendString = URL_BUY_LEDOU;
+        } break;
+        case BBQHTTPRequestTypeUpdateOrderStatue: {
+            appendString = URL_UPDATE_ORDER_STATUE;
+        } break;
+        case BBQHTTPRequestTypeGetQZK: {
+            appendString = URL_GET_QZK;
+        } break;
+        case BBQHTTPRequestTypeBuyQZK: {
+            appendString = URL_BUY_QZK;
+        } break;
+        case BBQHTTPRequestTypeAddiOSLeDouOrder: {
+            appendString = URL_ADD_IOS_LEDOU_ORDER;
+        } break;
+        case BBQHTTPRequestTypeGiftAndUserInfo: {
+            appendString = URL_GET_GIFT_AND_PERSONGIFT;
+        } break;
+        case BBQHTTPRequestTypeSendGift: {
+            appendString = URL_SEND_GIFT;
+        } break;
+            
+        case BBQHTTPRequestTypeiOSUpdateOrder: {
+            appendString = URL_IOS_UPDATE_ORDER;
+        } break;
+            
+        case BBQHTTPRequestTypeCreateAnnouncement: {
+            appendString = URL_CREATE_ANNOUNCEMENT;
+        } break;
+            
+        case BBQHTTPRequestTypeGetAnnouncementType: {
+            appendString = URL_GET_ANNOUNCEMENT_TYPE;
+        } break;
+        case BBQHTTPRequestTypeDailyReportOptions: {
+            appendString = URL_DAILYREPORT_OPTIONS;
+        } break;
+        case BBQHTTPRequestTypeBabyNotAtSchool: {
+            appendString = URL_BABY_NOT_AT_SCHOOL;
+        } break;
+        case BBQHTTPRequestTypeAddDailyReport: {
+            appendString = URL_ADD_DAILYREPORT;
+        } break;
+        case BBQHTTPRequestTypeCZSyulan: {
+            appendString = URL_CZS_yulan;
+        } break;
+        case BBQHTTPRequestTypeGetDailyReport: {
+            appendString = URL_GET_DAILYREPORT;
+        }break;
+        case BBQHTTPRequestTypeGetAttentionList:{
+            appendString = URL_GET_AttentionList;
+        }break;
+        case BBQHTTPRequestTypeGetPlace:{
+            appendString = URL_GET_Place;
+        }break;
+        case BBQHTTPRequestTypeGetSchool:{
+            appendString = URL_GET_School;
+        }break;
+        case BBQHTTPRequestTypeCreateBaobao:{
+            appendString = URL_CREATE_Baobao;
+        }break;
+        case BBQHTTPRequestTypeCancelBaobao:{
+            appendString = URL_CANCEL_Baobao;
+        }break;
+        case BBQHTTPRequestTypeYQM:{
+            appendString = URL_VERTIFY_YQM;
+        }break;
+        case BBQHTTPRequestTypeGetInviteList: {
+            appendString = URL_GET_InviteList;
+        }break;
+        case BBQHTTPRequestTypeInviteAudit: {
+            appendString = URL_InviteAudit;
+        }break;
+        case BBQHTTPRequestTypeAdvertisementLogin: {
+            appendString = URL_AdvertisementLogin;
+        }break;
+        case BBQHTTPRequestTypeIntoClass: {
+            appendString = URL_IntoClass;
+        }break;
+        case BBQHTTPRequestTypeBaobaoCover: {
+            appendString = URL_UPLOAD_COVER;
+        }break;
+        case BBQHTTPRequestTypeAdvertisementCZS: {
+            appendString = URL_AdvertisementCZS;
+        }break;
+        case BBQHTTPRequestTypeBaobaoDetail:{
+            appendString = URL_Baobao_Detail;
+        }break;
+        case BBQHTTPRequestTypeGetTaskStatus:{
+            appendString = URL_Get_TaskStatus;
+        }break;
+        case BBQHTTPRequestTypeGetGRADE:{
+            appendString = URL_Get_GRADE;
+        }break;
+        case BBQHTTPRequestTypeUploadAction:{
+            appendString = URL_Upload_Action;
+        }break;
+        case BBQHTTPRequestTypeGetFuture:{
+            appendString = URL_Get_Future;
+        }break;
+        case BBQHTTPRequestTypeAddFuture:{
+            appendString = URL_Add_Future;
+        }
+        default:
+            break;
+    }
+  RequestTime++;
+  NSString *URL = [CS_URL_BASE stringByAppendingString:appendString];
+  NSString *username = @"";
+  if (TheCurUser.member.username && TheCurUser.member.username.length > 0) {
+    username = TheCurUser.member.username;
+  }
+//  return
+//      [newURL stringByAddingPercentEscapesUsingEncoding:NSUTF8StringEncoding];
+    return URL;
+}
+
+@end

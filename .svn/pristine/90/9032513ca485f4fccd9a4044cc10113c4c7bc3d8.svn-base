@@ -1,0 +1,25 @@
+{
+  "DVTSourceControlWorkspaceBlueprintPrimaryRemoteRepositoryKey" : "890404e3-8f66-a746-86dc-087c1abfef6e++5943",
+  "DVTSourceControlWorkspaceBlueprintWorkingCopyRepositoryLocationsKey" : {
+    "890404e3-8f66-a746-86dc-087c1abfef6e++5943" : {
+
+    }
+  },
+  "DVTSourceControlWorkspaceBlueprintWorkingCopyStatesKey" : {
+    "890404e3-8f66-a746-86dc-087c1abfef6e++5943" : 0
+  },
+  "DVTSourceControlWorkspaceBlueprintIdentifierKey" : "F13BE3B5-8181-43B6-A05E-19E58F2459CE",
+  "DVTSourceControlWorkspaceBlueprintWorkingCopyPathsKey" : {
+    "890404e3-8f66-a746-86dc-087c1abfef6e++5943" : "NewBBQ\/"
+  },
+  "DVTSourceControlWorkspaceBlueprintNameKey" : "BBQ",
+  "DVTSourceControlWorkspaceBlueprintVersion" : 204,
+  "DVTSourceControlWorkspaceBlueprintRelativePathToProjectKey" : "BBQ.xcworkspace",
+  "DVTSourceControlWorkspaceBlueprintRemoteRepositoriesKey" : [
+    {
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryURLKey" : "https:\/\/171.111.153.138:8443\/svn\/bbq",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositorySystemKey" : "com.apple.dt.Xcode.sourcecontrol.Subversion",
+      "DVTSourceControlWorkspaceBlueprintRemoteRepositoryIdentifierKey" : "890404e3-8f66-a746-86dc-087c1abfef6e++5943"
+    }
+  ]
+}

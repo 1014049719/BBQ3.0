@@ -1,0 +1,485 @@
+//
+//  IPWTHttpUtils.m
+//  ipWorldTv
+//
+//  Created by my full name on 5/14/14.
+//  Copyright (c) 2014 IPWorldTv. All rights reserved.
+//
+
+#import "AFNetworkingHelper.h"
+#import "SBJson4.h"
+#import "SVProgressHUD.h"
+#import <Bugly/CrashReporter.h>
+#import "AppDelegate.h"
+
+static CGFloat const kTimeout = 20.0f;
+@implementation AFNetworkingHelper
+
+static NSMutableArray *networkQueue = nil;
+
++ (NSMutableArray *)getNetworkQueue {
+    if (networkQueue != nil)
+        return networkQueue;
+    networkQueue = [[NSMutableArray alloc] init];
+    return networkQueue;
+}
+
++ (void)cancelAllRunningNetworkOperations {
+    for (AFHTTPRequestOperation *operation in [self getNetworkQueue]) {
+        @try {
+            [operation cancel];
+            [networkQueue removeObject:operation];
+        } @catch (NSException *exception) {
+            NSLog(@"Error while cancelling the operation");
+        } @finally {
+        }
+    }
+}
+
++ (void)executePostWithUrl:(NSString *)url
+             andParameters:(NSDictionary *)parameters
+                andHeaders:(NSDictionary *)headers
+andAuthorizationHeaderUser:(NSString *)user
+andAuthrozationHeaderPassword:(NSString *)password
+        withSuccessHandler:(void (^)(AFHTTPRequestOperation *, id,
+                                     bool))success
+        withFailureHandler:(void (^)(AFHTTPRequestOperation *,
+                                     NSError *))failure
+         withLoadingViewOn:(UIView *)parentView {
+    AFHTTPRequestOperationManager *manager =
+    [AFHTTPRequestOperationManager manager];
+    [manager setRequestSerializer:[AFJSONRequestSerializer serializer]];
+    [[manager securityPolicy] setAllowInvalidCertificates:YES];
+    [[manager requestSerializer]
+     setAuthorizationHeaderFieldWithUsername:user
+     password:password];
+    [manager setResponseSerializer:[AFJSONResponseSerializer serializer]];
+    
+    [[manager requestSerializer] setValue:@"application/json"
+                       forHTTPHeaderField:@"Content-Type"];
+    // check if custom headers are present and add them
+    if (headers != nil) {
+        [headers enumerateKeysAndObjectsUsingBlock:^(id key, id obj, BOOL *stop) {
+            [[manager requestSerializer] setValue:obj forHTTPHeaderField:key];
+        }];
+    }
+    AFHTTPRequestOperation *operation;
+    if (parentView == nil) {
+        operation = [manager POST:url
+                       parameters:parameters
+                          success:^(AFHTTPRequestOperation *operation, id responseObject) {
+                              if ([operation isCancelled]) {
+                                  return;
+                              }
+                              [[self getNetworkQueue] removeObject:operation];
+                              NSLog(@"success %@ - %@", operation, responseObject);
+                              bool apiSuccess = YES;
+                              success(operation, responseObject, apiSuccess);
+                          }
+                          failure:^(AFHTTPRequestOperation *operation, NSError *error) {
+                              if ([operation isCancelled]) {
+                                  return;
+                              }
+                              [[self getNetworkQueue] removeObject:operation];
+                              failure(operation, error);
+                          }];
+    }
+    [[self getNetworkQueue] addObject:operation];
+}
+
++ (void)
+executeDeleteWithUrl:(NSString *)url
+AndParameters:(NSDictionary *)parameters
+AndHeaders:(NSDictionary *)headers
+withSuccessHandler:(void (^)(AFHTTPRequestOperation *, id, bool))success
+withFailureHandler:(void (^)(AFHTTPRequestOperation *, NSError *))failure
+withLoadingViewOn:(UIView *)parentView {
+    
+    
+    
+    AFHTTPRequestOperationManager *manager =
+    [AFHTTPRequestOperationManager manager];
+    [manager setRequestSerializer:[AFJSONRequestSerializer serializer]];
+    [manager setResponseSerializer:[AFJSONResponseSerializer serializer]];
+    [[manager requestSerializer] setValue:@"application/json"
+                       forHTTPHeaderField:@"Content-Type"];
+    // check if custom headers are present and add them
+    if (headers != nil) {
+        [headers enumerateKeysAndObjectsUsingBlock:^(id key, id obj, BOOL *stop) {
+            [[manager requestSerializer] setValue:obj forHTTPHeaderField:key];
+        }];
+    }
+    AFHTTPRequestOperation *operation;
+    if (parentView == nil) {
+        operation = [manager DELETE:url
+                         parameters:parameters
+                            success:^(AFHTTPRequestOperation *operation, id responseObject) {
+                                if ([operation isCancelled]) {
+                                    return;
+                                }
+                                [[self getNetworkQueue] removeObject:operation];
+                                NSLog(@"success %@ - %@", operation, responseObject);
+                                bool apiSuccess = YES;
+                                success(operation, responseObject, apiSuccess);
+                            }
+                            failure:^(AFHTTPRequestOperation *operation, NSError *error) {
+                                if ([operation isCancelled]) {
+                                    return;
+                                }
+                                [[self getNetworkQueue] removeObject:operation];
+                                NSLog(@"failure %@ - %@", operation, error);
+                                if (![operation isEqual:nil] & ![error isEqual:nil]) {
+                                    failure(operation, error);
+                                }
+                            }];
+    }
+    [[self getNetworkQueue] addObject:operation];
+}
+
++ (void)executePostWithUrl:(NSString *)url
+             andParameters:(NSDictionary *)parameters
+                andHeaders:(NSDictionary *)headers
+ constructingBodyWithBlock:(void (^)(id<AFMultipartFormData> formData))block
+        withSuccessHandler:(void (^)(AFHTTPRequestOperation *operation,
+                                     id responseObject, bool apiSuccess))success
+          withErrorHandler:(void (^)(NSDictionary *responseObject))error
+        withFailureHandler:(void (^)(AFHTTPRequestOperation *operation,
+                                     NSError *error))failure
+         withLoadingViewOn:(UIView *)parentView {
+    
+    AFHTTPRequestOperationManager *manager =
+    [AFHTTPRequestOperationManager manager];
+    [BBQLoginManager loadCookies];
+    
+    manager.requestSerializer.timeoutInterval = kTimeout;
+    [manager setResponseSerializer:[AFJSONResponseSerializer serializer]];
+    manager.responseSerializer.acceptableContentTypes =
+    [NSSet setWithObjects:@"application/json", @"text/json",
+     @"text/javascript", @"text/html", nil];
+    // hack to allow 'text/plain' content-type to work
+    NSMutableSet *contentTypes = [NSMutableSet
+                                  setWithSet:manager.responseSerializer.acceptableContentTypes];
+    [contentTypes addObject:@"text/plain"];
+    manager.responseSerializer.acceptableContentTypes = contentTypes;
+    // check if custom headers are present and add them
+    if (headers != nil) {
+        [headers enumerateKeysAndObjectsUsingBlock:^(id key, id obj, BOOL *stop) {
+            [[manager requestSerializer] setValue:obj forHTTPHeaderField:key];
+        }];
+    }
+    
+    AFHTTPRequestOperation *operation;
+    if (parentView == nil) {
+        operation = [manager POST:url
+                       parameters:parameters
+        constructingBodyWithBlock:block
+                          success:^(AFHTTPRequestOperation *operation,
+                                    NSDictionary *responseObject) {
+                              if ([operation isCancelled]) {
+                                  [SVProgressHUD dismiss];
+                                  return;
+                              }
+                              [[self getNetworkQueue] removeObject:operation];
+                              NSLog(@"success %@ - %@", operation, responseObject);
+                              bool apiSuccess = YES;
+                              if ([responseObject[@"res"] integerValue] == 1) {
+                                  if (success) {
+                                      success(operation, responseObject, apiSuccess);
+                                  } else {
+                                      [SVProgressHUD dismiss];
+                                  }
+                              } else {
+                                  if (error) {
+                                      error(responseObject);
+                                  } else {
+                                      [SVProgressHUD showErrorWithStatus:responseObject[@"msg"]];
+                                  }
+                              }
+                          }
+                          failure:^(AFHTTPRequestOperation *operation, NSError *error) {
+                              if ([operation isCancelled]) {
+                                  [SVProgressHUD dismiss];
+                                  return;
+                              }
+                              [SVProgressHUD showErrorWithStatus:error.localizedDescription];
+                              
+                              [[self getNetworkQueue] removeObject:operation];
+                              NSLog(@"failure %@ - %@", operation, error);
+                              
+                              if (![operation isEqual:nil] & ![error isEqual:nil]) {
+                                  if (failure) {
+                                      dispatch_after(
+                                                     dispatch_time(
+                                                                   DISPATCH_TIME_NOW,
+                                                                   (int64_t)([self displayDurationForString:
+                                                                              error.localizedDescription] *
+                                                                             NSEC_PER_SEC)),
+                                                     dispatch_get_main_queue(), ^{
+                                                         failure(operation, error);
+                                                     });
+                                  }
+                              }
+                          }];
+    }
+    [[self getNetworkQueue] addObject:operation];
+}
+
++ (void)executePostWithUrl:(NSString *)url
+             andParameters:(NSDictionary *)parameters
+                andHeaders:(NSDictionary *)headers
+        withSuccessHandler:(void (^)(AFHTTPRequestOperation *operation,
+                                     NSDictionary *responseObject,
+                                     bool apiSuccess))success
+          withErrorHandler:(void (^)(NSDictionary *responseObject))error
+        withFailureHandler:(void (^)(AFHTTPRequestOperation *operation,
+                                     NSError *error))failure
+         withLoadingViewOn:(UIView *)parentView {
+    
+    NSLog(@"Executing post request for %@", url);
+    AFHTTPRequestOperationManager *manager =
+    [AFHTTPRequestOperationManager manager];
+    [BBQLoginManager loadCookies];
+    manager.requestSerializer.timeoutInterval = kTimeout;
+    [manager setResponseSerializer:[AFJSONResponseSerializer serializer]];
+    manager.responseSerializer.acceptableContentTypes =
+    [NSSet setWithObjects:@"application/json", @"text/json",
+     @"text/javascript", @"text/html", nil];
+    // check if custom headers are present and add them
+    if (headers != nil) {
+        [headers enumerateKeysAndObjectsUsingBlock:^(id key, id obj, BOOL *stop) {
+            [[manager requestSerializer] setValue:obj forHTTPHeaderField:key];
+        }];
+    }
+    
+    AFHTTPRequestOperation *operation;
+    if (parentView == nil) {
+        operation = [manager POST:url
+                       parameters:parameters
+                          success:^(AFHTTPRequestOperation *operation,
+                                    NSDictionary *responseObject) {
+                              
+                              if ([operation isCancelled]) {
+                                  [SVProgressHUD dismiss];
+                                  return;
+                              }
+                              [[self getNetworkQueue] removeObject:operation];
+                              //      NSLog(@"success %@ - %@", operation, responseObject);
+                              bool apiSuccess = YES;
+                              
+                              if ([responseObject[@"res"] integerValue] == 1) {
+                                  if (success) {
+                                      success(operation, responseObject, apiSuccess);
+                                  } else {
+                                      [SVProgressHUD dismiss];
+                                  }
+                              } else if ([responseObject[@"res"] integerValue] == 2) {
+                                  NSString *msg = responseObject[@"msg"];
+                                  dispatch_async_on_main_queue(^{
+                                      [SVProgressHUD showErrorWithStatus:msg];
+                                      dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(HUD_DURATION(msg) * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                                          [((AppDelegate *)[UIApplication sharedApplication].delegate)
+                                           setupLoginViewControllerInit:NO];
+                                      });
+                                  });
+                              } else {
+                                  if (error) {
+                                      error(responseObject);
+                                  } else {
+                                      [SVProgressHUD dismiss];
+                                  }
+                                  // bugly
+                                  NSError *errr = [[NSError alloc]
+                                                   initWithDomain:url
+                                                   code:[responseObject[@"res"] integerValue]
+                                                   userInfo:responseObject];
+                                  dispatch_async(
+                                                 dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0),
+                                                 ^{
+                                                     [[CrashReporter sharedInstance]
+                                                      reportError:errr
+                                                      reason:responseObject[@"msg"]
+                                                      extraInfo:responseObject];
+                                                 });
+                              }
+                          }
+                          failure:^(AFHTTPRequestOperation *operation, NSError *error) {
+                              if ([operation isCancelled]) {
+                                  [SVProgressHUD dismiss];
+                                  return;
+                              }
+                              [[self getNetworkQueue] removeObject:operation];
+                              NSLog(@"failure %@ - %@", operation, error);
+                              // bugly
+                              dispatch_async(
+                                             dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+                                                 [[CrashReporter sharedInstance]
+                                                  reportError:error
+                                                  reason:[NSString
+                                                          stringWithFormat:@"failure, url = %@", url]
+                                                  extraInfo:operation.responseObject];
+                                             });
+                              if (![operation isEqual:nil] & ![error isEqual:nil]) {
+                                  if (failure) {
+                                      failure(operation, error);
+                                  } else {
+                                      [SVProgressHUD dismiss];
+                                  }
+                              }
+                          }];
+    }
+    [[self getNetworkQueue] addObject:operation];
+}
+
++ (void)executePutWithUrl:(NSString *)url
+            andParameters:(NSDictionary *)parameters
+               andHeaders:(NSDictionary *)headers
+       withSuccessHandler:(void (^)(AFHTTPRequestOperation *, id, bool))success
+       withFailureHandler:(void (^)(AFHTTPRequestOperation *, NSError *))failure
+        withLoadingViewOn:(UIView *)parentView {
+    
+    AFHTTPRequestOperationManager *manager =
+    [AFHTTPRequestOperationManager manager];
+    [manager setRequestSerializer:[AFJSONRequestSerializer serializer]];
+    [manager setResponseSerializer:[AFJSONResponseSerializer serializer]];
+    [[manager requestSerializer] setValue:@"application/json"
+                       forHTTPHeaderField:@"Content-Type"];
+    // check if custom headers are present and add them
+    if (headers != nil) {
+        [headers enumerateKeysAndObjectsUsingBlock:^(id key, id obj, BOOL *stop) {
+            [[manager requestSerializer] setValue:obj forHTTPHeaderField:key];
+        }];
+    }
+    AFHTTPRequestOperation *operation;
+    if (parentView == nil) {
+        operation = [manager PUT:url
+                      parameters:parameters
+                         success:^(AFHTTPRequestOperation *operation, id responseObject) {
+                             if ([operation isCancelled]) {
+                                 return;
+                             }
+                             [[self getNetworkQueue] removeObject:operation];
+                             NSLog(@"success %@ - %@", operation, responseObject);
+                             bool apiSuccess = YES;
+                             success(operation, responseObject, apiSuccess);
+                         }
+                         failure:^(AFHTTPRequestOperation *operation, NSError *error) {
+                             if ([operation isCancelled]) {
+                                 return;
+                             }
+                             [[self getNetworkQueue] removeObject:operation];
+                             NSLog(@"failure %@ - %@", operation, error);
+                             if (![operation isEqual:nil] & ![error isEqual:nil]) {
+                                 failure(operation, error);
+                             }
+                         }];
+    }
+    [[self getNetworkQueue] addObject:operation];
+}
+
++ (void)executeGetWithUrl:(NSString *)url
+            andParameters:(NSDictionary *)parameters
+               andHeaders:(NSDictionary *)headers
+       withSuccessHandler:(void (^)(AFHTTPRequestOperation *, id, bool))success
+       withFailureHandler:(void (^)(AFHTTPRequestOperation *, NSError *))failure
+        withLoadingViewOn:(UIView *)parentView {
+    
+    AFHTTPRequestOperationManager *manager =
+    [AFHTTPRequestOperationManager manager];
+    [manager setRequestSerializer:[AFJSONRequestSerializer serializer]];
+    [manager setResponseSerializer:[AFJSONResponseSerializer serializer]];
+    [[manager requestSerializer] setValue:@"application/json"
+                       forHTTPHeaderField:@"Content-Type"];
+    // check if custom headers are present and add them
+    if (headers != nil) {
+        [headers enumerateKeysAndObjectsUsingBlock:^(id key, id obj, BOOL *stop) {
+            [[manager requestSerializer] setValue:obj forHTTPHeaderField:key];
+        }];
+    }
+    // if failure is nil then its an indication to handle it with default flow
+    // that is showing message
+    // in alert dialog
+    AFHTTPRequestOperation *operation;
+    if (parentView == nil) {
+        operation = [manager GET:url
+                      parameters:parameters
+                         success:^(AFHTTPRequestOperation *operation, id responseObject) {
+                             if ([operation isCancelled]) {
+                                 return;
+                             }
+                             [[self getNetworkQueue] removeObject:operation];
+                             bool apiSuccess = YES;
+                             success(operation, responseObject, apiSuccess);
+                         }
+                         failure:^(AFHTTPRequestOperation *operation, NSError *error) {
+                             if ([operation isCancelled]) {
+                                 return;
+                             }
+                             [[self getNetworkQueue] removeObject:operation];
+                             NSLog(@"failure %@ - %@", operation, error);
+                             if (![operation isEqual:nil] & ![error isEqual:nil]) {
+                                 @try {
+                                     if (failure)
+                                         failure(operation, error);
+                                     
+                                 } @catch (NSException *exception) {
+                                     NSLog(@"exception handling timeout %@", exception);
+                                 }
+                             }
+                         }];
+    }
+    [[self getNetworkQueue] addObject:operation];
+}
+
++ (void)
+executePatchWithUrl:(NSString *)url
+andParameters:(NSDictionary *)parameters
+andHeaders:(NSDictionary *)headers
+withSuccessHandler:(void (^)(AFHTTPRequestOperation *, id, bool))success
+withFailureHandler:(void (^)(AFHTTPRequestOperation *, NSError *))failure
+withLoadingViewOn:(UIView *)parentView {
+    
+    AFHTTPRequestOperationManager *manager =
+    [AFHTTPRequestOperationManager manager];
+    [manager setRequestSerializer:[AFJSONRequestSerializer serializer]];
+    [manager setResponseSerializer:[AFJSONResponseSerializer serializer]];
+    [[manager requestSerializer] setValue:@"application/json"
+                       forHTTPHeaderField:@"Content-Type"];
+    // check if custom headers are present and add them
+    if (headers != nil) {
+        [headers enumerateKeysAndObjectsUsingBlock:^(id key, id obj, BOOL *stop) {
+            [[manager requestSerializer] setValue:obj forHTTPHeaderField:key];
+        }];
+    }
+    AFHTTPRequestOperation *operation;
+    if (parentView == nil) {
+        
+        operation = [manager PATCH:url
+                        parameters:parameters
+                           success:^(AFHTTPRequestOperation *operation, id responseObject) {
+                               if ([operation isCancelled]) {
+                                   return;
+                               }
+                               [[self getNetworkQueue] removeObject:operation];
+                               NSLog(@"success %@ - %@", operation, responseObject);
+                               bool apiSuccess = YES;
+                               success(operation, responseObject, apiSuccess);
+                           }
+                           failure:^(AFHTTPRequestOperation *operation, NSError *error) {
+                               if ([operation isCancelled]) {
+                                   return;
+                               }
+                               [[self getNetworkQueue] removeObject:operation];
+                               NSLog(@"failure %@ - %@", operation, error);
+                               if (![operation isEqual:nil] & ![error isEqual:nil]) {
+                                   failure(operation, error);
+                               }
+                           }];
+    }
+    [[self getNetworkQueue] addObject:operation];
+}
+
++ (NSTimeInterval)displayDurationForString:(NSString *)string {
+    return MIN((float)string.length * 0.06 + 0.5, 5.0);
+}
+
+@end

@@ -1,0 +1,266 @@
+//
+//  ResetPassKeyTableViewController.m
+//  BBQ
+//
+//  Created by wth on 15/8/25.
+//  Copyright (c) 2015年 bbq. All rights reserved.
+//
+
+#import "ResetPassKeyTableViewController.h"
+#import "CheckTools.h"
+#import "DES.h"
+#import "AppDelegate.h"
+#import <SSKeychain.h>
+#import "JNKeychain.h"
+
+@interface ResetPassKeyTableViewController () <UITextFieldDelegate>
+
+//密码提示View
+@property(weak, nonatomic) IBOutlet UIView *ResetPassKeyView;
+
+@property(weak, nonatomic) IBOutlet UIButton *yanzhengBtn;
+@property(strong, nonatomic) NSTimer *timer;
+
+@property(weak, nonatomic) IBOutlet UITextField *phoneNumTextField;
+@property(weak, nonatomic) IBOutlet UITextField *codeNumTextField;
+@property(weak, nonatomic) IBOutlet UITextField *PassNewTextField;
+@property(weak, nonatomic) IBOutlet UITextField *PassAgainTextField;
+
+@end
+
+@implementation ResetPassKeyTableViewController
+
+//静态时间
+static int MyTime = 50;
+
+- (void)viewDidLoad {
+    [super viewDidLoad];
+    
+    self.tableView.tableFooterView = [UIView new];
+    
+    self.phoneNumTextField.text = self.phoneNum;
+    if (!self.phoneNum && TheCurUser.phone_bind == YES) {
+        self.phoneNumTextField.text = TheCurUser.member.username;
+    }
+    
+    if (self.type == BBQResetPasswordTypeLogin) {
+        self.navigationController.interactivePopGestureRecognizer.enabled = NO;
+        [[NSNotificationCenter defaultCenter]
+         postNotificationName:kSetNeedsRefreshEntireDataNotification
+         object:nil
+         userInfo:@{
+                    @"type" : @(BBQRefreshNotificationTypeAll)
+                    }];
+        UIBarButtonItem *backButton =
+        [[UIBarButtonItem alloc] initWithTitle:@"返回"
+                                         style:UIBarButtonItemStylePlain
+                                        target:self
+                                        action:@selector(didClickBackButton)];
+        self.navigationItem.leftBarButtonItem = backButton;
+        
+        UIBarButtonItem *rightItem =
+        [[UIBarButtonItem alloc] initWithTitle:@"跳过"
+                                         style:UIBarButtonItemStylePlain
+                                        target:self
+                                        action:@selector(rightItemEvent)];
+        self.navigationItem.rightBarButtonItem = rightItem;
+    }
+    
+    if ([BBQLoginManager isLogin]) {
+        _phoneNumTextField.text = TheCurUser.member.username;
+        _phoneNumTextField.userInteractionEnabled = NO;
+    }
+    
+    _phoneNumTextField.delegate = self;
+    _codeNumTextField.delegate = self;
+    _PassNewTextField.delegate = self;
+    _PassAgainTextField.delegate = self;
+}
+
+- (void)rightItemEvent {
+    [self didClickBackButton];
+}
+
+- (void)didClickBackButton {
+    [((AppDelegate *)[UIApplication sharedApplication].delegate)
+     setupTabBarController];
+}
+
+- (BOOL)textFieldShouldReturn:(UITextField *)textField {
+    [_phoneNumTextField resignFirstResponder];
+    [_codeNumTextField resignFirstResponder];
+    [_PassNewTextField resignFirstResponder];
+    [_PassAgainTextField resignFirstResponder];
+    return YES;
+}
+
+//获取短信验证码
+- (IBAction)BtnClick:(id)sender {
+    //检查手机号码格式
+    if ([CheckTools checkTelNumber:_phoneNumTextField.text]) {
+        
+        //号码正确开始计时
+        self.timer = [NSTimer scheduledTimerWithTimeInterval:1
+                                                      target:self
+                                                    selector:@selector(timerClick)
+                                                    userInfo:nil
+                                                     repeats:YES];
+        self.yanzhengBtn.enabled = NO;
+        self.yanzhengBtn.backgroundColor = [UIColor colorWithRed:170 / 255.0
+                                                           green:171 / 255.0
+                                                            blue:172 / 255.0
+                                                           alpha:1];
+        //        [self.yanzhengBtn.titleLabel setTextColor:[UIColor whiteColor]];
+        
+        [self getVerifyCode:_phoneNumTextField.text];
+    } else {
+        [SVProgressHUD showErrorWithStatus:@"请确认输入号码是否正确"];
+    }
+}
+
+//计时器
+- (void)timerClick {
+    
+    MyTime--;
+    [self.yanzhengBtn setTitle:[NSString stringWithFormat:@"%d秒", MyTime]
+                      forState:UIControlStateNormal];
+    if (MyTime < 0) {
+        [self.yanzhengBtn setTitle:@"重新获取" forState:UIControlStateNormal];
+        self.yanzhengBtn.enabled = YES;
+        self.yanzhengBtn.backgroundColor =
+        [UIColor colorWithRed:255 / 255.0 green:186 / 255.0 blue:0 alpha:1];
+        [self.timer invalidate];
+        MyTime = 50;
+    }
+}
+- (void)viewDidDisappear:(BOOL)animated {
+    [super viewDidDisappear:animated];
+    [self.timer invalidate];
+}
+
+//确认修改按钮
+- (IBAction)enterBtnClick:(id)sender {
+    
+    //检查密码正确 验证码不为空
+    if ([CheckTools checkPassword:_PassNewTextField.text] &&
+        [_PassNewTextField.text isEqualToString:_PassAgainTextField.text] &&
+        _codeNumTextField.text.length != 0 ) {
+        
+        [self updatepasswordWithVerifyCode:_phoneNumTextField.text
+                                    verify:_codeNumTextField.text
+                               newpassword:_PassNewTextField.text
+                              newpassword2:_PassAgainTextField.text];
+    } else if (![_PassNewTextField.text
+                 isEqualToString:_PassAgainTextField.text]) {
+        
+        [SVProgressHUD showErrorWithStatus:@"请确认输入密码是否一致"];
+    } else if (_codeNumTextField.text.length == 0) {
+        
+        [SVProgressHUD showErrorWithStatus:@"请输入验证码"];
+    } else if (_PassNewTextField.text.length == 0) {
+        
+        [SVProgressHUD showErrorWithStatus:@"请输入新密码"];
+    } else if (![CheckTools checkPassword:_PassNewTextField.text]) {
+        
+        [SVProgressHUD showErrorWithStatus:@"请输入6-16位数密码"];
+    }
+}
+
+#pragma mark network
+
+- (void)getVerifyCode:(NSString *)mobile {
+    
+    [SVProgressHUD showWithStatus:@"请稍候..."];
+    
+    NSDictionary *params = @{ @"mobile" : mobile };
+    
+    [BBQHTTPRequest
+     queryWithType:BBQHTTPRequestTypeSendVerifyCode
+     param:params
+     successHandler:^(AFHTTPRequestOperation *operation,
+                      NSDictionary *responseObject, bool apiSuccess) {
+         NSString *message = @"已发送验证码，请注意查收";
+         [SVProgressHUD showSuccessWithStatus:message];
+     } errorHandler:nil
+     failureHandler:nil];
+}
+
+- (void)updatepasswordWithVerifyCode:(NSString *)mobile
+                              verify:(NSString *)verifycode
+                         newpassword:(NSString *)newpassword
+                        newpassword2:(NSString *)newpassword2 {
+    
+    
+    
+    NSDictionary *params = @{
+                             @"mobile" : mobile,
+                             @"yzcode" : verifycode,
+                             @"newpassword" : newpassword,
+                             @"newpassword2" : newpassword2
+                             };
+    NSString *oldPassword = [JNKeychain loadValueForKey:[TheCurUser.member.uid stringValue]];
+    if ([oldPassword isEqualToString:newpassword]) {
+        [SVProgressHUD showErrorWithStatus:@"新密码不能和旧密码一致，请修改"];
+        return;
+    }
+    [SVProgressHUD showWithStatus:@"请稍候..."];
+    [BBQHTTPRequest
+     queryWithType:BBQHTTPRequestTypeChangePasswordWithVerifyCode
+     param:params
+     successHandler:^(AFHTTPRequestOperation *operation,
+                      NSDictionary *responseObject, bool apiSuccess) {
+         NSString *message = @"密码修改成功";
+         [SVProgressHUD showSuccessWithStatus:message];
+         dispatch_after(
+                        dispatch_time(DISPATCH_TIME_NOW,
+                                      (int64_t)(HUD_DURATION(message) * NSEC_PER_SEC)),
+                        dispatch_get_main_queue(), ^{
+                            [[NSUserDefaults standardUserDefaults] setValue:newpassword forKey:[NSString stringWithFormat:@"password%@", [TheCurUser.member.uid stringValue]]];
+                            if (self.type == BBQResetPasswordTypeLogin) {
+                                [((AppDelegate *)[UIApplication sharedApplication].delegate)
+                                 setupTabBarController];
+                            } else {
+                                [self.navigationController popViewControllerAnimated:YES];
+                            }
+                        });
+     } errorHandler:^(NSDictionary *responseObject) {
+         [SVProgressHUD showErrorWithStatus:responseObject[@"msg"]];
+     } failureHandler:^(AFHTTPRequestOperation *operation, NSError *error) {
+         [SVProgressHUD showErrorWithStatus:@"修改失败"];
+     }];
+}
+
+- (CGFloat)tableView:(UITableView *)tableView
+heightForRowAtIndexPath:(NSIndexPath *)indexPath {
+    
+    if (indexPath.row == 0) {
+        //        //如果不为初始密码。隐藏提示框
+        if ((TheCurUser.member.groupkey.integerValue != 1 ||
+             (TheCurUser.member.groupkey.integerValue == 1 && TheCurBaoBao.qx.integerValue == 1)) &&
+            [TheCurUser.member.password isEqualToString:@"123456"]) {
+            self.ResetPassKeyView.hidden = NO;
+            return 62;
+        } else {
+            self.ResetPassKeyView.hidden = YES;
+            return 0;
+        }
+    } else if (indexPath.row == 5) {
+        
+        return 90;
+    }
+    return 46;
+}
+
+- (void)scrollViewWillBeginDragging:(UIScrollView *)scrollView {
+    [_phoneNumTextField resignFirstResponder];
+    [_codeNumTextField resignFirstResponder];
+    [_PassNewTextField resignFirstResponder];
+    [_PassAgainTextField resignFirstResponder];
+}
+
+- (void)didReceiveMemoryWarning {
+    [super didReceiveMemoryWarning];
+    // Dispose of any resources that can be recreated.
+}
+
+@end

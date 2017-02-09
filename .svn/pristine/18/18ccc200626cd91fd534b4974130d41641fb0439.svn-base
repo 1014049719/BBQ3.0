@@ -1,0 +1,737 @@
+//
+//  LeDouPayViewController.m
+//  BBQ
+//
+//  Created by wth on 15/7/22.
+//  Copyright (c) 2015年 bbq. All rights reserved.
+//
+
+#import "LeDouPayViewController.h"
+#import "LeDouPayTableViewController.h"
+#import "HttpTool.h"
+#import "BuyCardView.h"
+#import "OrderDetailViewController.h"
+#import "NotificationMacro.h"
+#import "SelectFriendsViewController.h"
+#import "RelativeModel.h"
+#import <IAPHelper.h>
+#import <IAPShare.h>
+#import <NSString+Base64.h>
+#import <BlocksKit+UIKit.h>
+#import "NSString+Common.h"
+
+@interface LeDouPayViewController ()
+@property(weak, nonatomic) IBOutlet NSLayoutConstraint *TopLayout;
+
+///未购买亲子卡提示view
+@property(weak, nonatomic) IBOutlet UIView *remindView;
+///未开通提示
+@property(weak, nonatomic) IBOutlet UILabel *lbNoQzkTip;
+
+///已购买亲子卡提示view
+@property(weak, nonatomic) IBOutlet UIView *havingQzkView;
+///开通提示
+@property(weak, nonatomic) IBOutlet UILabel *lbQzkTip;
+
+//账号名称
+@property(weak, nonatomic) IBOutlet UILabel *lbName;
+//乐豆数
+@property(weak, nonatomic) IBOutlet UILabel *lbLedouNum;
+
+@property(weak, nonatomic) IBOutlet UIView *payStyleView;
+@property(weak, nonatomic) IBOutlet UIImageView *BlackAlphaImageView;
+@property(weak, nonatomic) IBOutlet UILabel *moneyLabel;
+
+///赠送按钮
+@property(weak, nonatomic) IBOutlet UIButton *btnGive;
+
+///充值按钮
+@property(weak, nonatomic) IBOutlet UIButton *btnPay;
+
+//只在老师园长端显示充值View(后来修改 三个端一样)
+@property(weak, nonatomic) IBOutlet UIView *only_view;
+
+@property(strong, nonatomic) LeDouPayTableViewController *leDouTabVcl;
+
+@property(strong, nonatomic) BuyCardView *buyCardView;
+
+//@property (copy, nonatomic) NSNumber *schema_czid;
+@property(strong, nonatomic) NSString *schema_name;
+@property(strong, nonatomic) NSNumber *schema_discut;
+@property(strong, nonatomic) NSString *schema_meno;
+@property(strong, nonatomic) NSArray *schema_cztype;
+
+@property(strong, nonatomic) NSNumber *qzk_flag; //亲子卡开通标示
+
+@property(strong, nonatomic) NSNumber *myledou;
+
+@property(assign, nonatomic) int schema_cur_no;
+@property(assign, nonatomic) float totalPrice;
+
+@property(nonatomic, strong) NSString *orderid; //购买相关数据
+@property(nonatomic, strong) NSDictionary *charge;
+@property(nonatomic, strong) NSNumber *ordertime;
+@property(nonatomic, strong) NSNumber *orderprice;
+@property(nonatomic, strong) NSArray *arrBuyUid;
+
+@property(nonatomic, strong) NSArray *aryID;
+
+@property(assign, nonatomic) int leDouNum;
+
+@property(copy, nonatomic) NSString *reason;
+
+@property(assign, nonatomic) int result;
+
+@end
+
+@implementation LeDouPayViewController
+
+- (void)viewDidLoad {
+  [super viewDidLoad];
+  // Do any additional setup after loading the view.
+
+  _payStyleView.hidden = YES;
+  _BlackAlphaImageView.hidden = YES;
+
+  NSLog(@"into LeDouPayViewController viewDidLoad");
+
+  self.schema_cur_no = -1;
+
+  [self downloadData];
+  [[NSNotificationCenter defaultCenter]
+      addObserver:self
+         selector:@selector(refreshData:)
+             name:kSetNeedsRefreshEntireDataNotification
+           object:nil];
+
+#ifdef TARGET_PARENT //家长
+
+  //    self.only_view.hidden=YES;
+  _aryID = @[
+    @"bbq.Family.LeDou18",
+    @"bbq.Family.LeDou45",
+    @"bbq.Family.LeDou78",
+    @"bbq.Family.LeDou153"
+  ];
+#elif TARGET_TEACHER //老师
+
+  _aryID = @[
+    @"bbq.Teacher.LeDou18",
+    @"bbq.Teacher.LeDou45",
+    @"bbq.Teacher.LeDou78",
+    @"bbq.Teacher.LeDou153"
+  ];
+#else //园长
+
+  _aryID = @[
+    @"bbq.Master.LeDou18",
+    @"bbq.Master.LeDou45",
+    @"bbq.Master.LeDou78",
+    @"bbq.Master.LeDou153"
+  ];
+#endif
+}
+
+- (void)refreshData:(NSNotification *)notification {
+  NSDictionary *userInfo = notification.userInfo;
+  if ([userInfo[@"type"] integerValue] == BBQRefreshNotificationTypeUserInfo) {
+    [self downloadData];
+  }
+}
+
+- (void)viewDidAppear:(BOOL)animated {
+  [super viewDidAppear:animated];
+
+  //[self downloadData];
+}
+
+//关闭提示窗
+- (IBAction)CloseBtnClick:(id)sender {
+
+  NSLog(@"关闭提示窗口。。。。。。。。。");
+
+  [UIView animateWithDuration:0.5
+      delay:0
+      usingSpringWithDamping:1
+      initialSpringVelocity:0.5
+      options:UIViewAnimationOptionCurveEaseOut
+      animations:^{
+
+        _havingQzkView.hidden = YES;
+        _remindView.hidden = YES;
+        _TopLayout.constant = 0;
+
+      }
+      completion:^(BOOL finished){
+
+      }];
+}
+
+//充值
+- (IBAction)payBtnClick:(id)sender {
+
+  if (self.schema_cur_no < 0) {
+    [SVProgressHUD showInfoWithStatus:@"请先选择一种充值方案"];
+    return;
+  }
+  [SVProgressHUD showWithStatus:@"请稍候..."];
+  self.arrBuyUid = @[ TheCurUser.member.uid ];
+
+  NSArray *aryPrice = @[ @"18", @"45", @"78", @"153" ];
+  NSString *price = aryPrice[self.schema_cur_no];
+  NSDictionary *params = @{
+    @"revnum" : @1,
+    @"revuiddata" : self.arrBuyUid,
+    @"total" : price,
+    @"Int" : @(self.leDouNum)
+  };
+
+  [BBQHTTPRequest
+       queryWithType:BBQHTTPRequestTypeAddiOSLeDouOrder
+               param:params
+      successHandler:^(AFHTTPRequestOperation *operation,
+                       NSDictionary *responseObject, bool apiSuccess) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+          //进入苹果支付
+          NSDictionary *dicData = [responseObject objectForKey:@"data"];
+          self.orderid = pickJsonStrValue(dicData, @"orderid");
+          [self getIAPWithProductID:_aryID[self.schema_cur_no]];
+        });
+      } errorHandler:nil
+      failureHandler:nil];
+}
+
+//赠送
+- (IBAction)giveBtnlick:(id)sender {
+  if (self.schema_cur_no < 0) {
+    [SVProgressHUD showInfoWithStatus:@"请先选择一种充值方案"];
+    return;
+  }
+
+  UIStoryboard *sb = [UIStoryboard storyboardWithName:@"RootTabBar" bundle:nil];
+  SelectFriendsViewController *vc = [sb
+      instantiateViewControllerWithIdentifier:@"SelectFriendsViewController"];
+  vc.productID = _aryID[self.schema_cur_no];
+  NSArray *aryPrice = @[ @"18", @"45", @"78", @"153" ];
+  NSString *price = aryPrice[self.schema_cur_no];
+  vc.price = price;
+  vc.ledouNum = self.leDouNum;
+  vc.block = ^(int num) {
+    float money = [self caculateMoney:num];
+    return money;
+  };
+
+  //    vc.payblock = ^(NSArray *arr) {
+  //        [self.navigationController popViewControllerAnimated:YES];
+  //
+  //        self.arrBuyUid = arr;
+  //
+  //        self.totalPrice = [self caculateMoney:(int)arr.count];
+  //        self.buyCardView = [[BuyCardView alloc] init];
+  //        [self.buyCardView showBuyCardViewWithPrice:self.totalPrice];
+  //        [self.buyCardView.confirmButton addTarget:self
+  //        action:@selector(confirmToPay)
+  //        forControlEvents:UIControlEventTouchUpInside];
+  //
+  //    };
+
+  [self.navigationController pushViewController:vc animated:YES];
+}
+
+//苹果支付
+- (void)getIAPWithProductID:(NSString *)productID {
+
+  if (![IAPShare sharedHelper].iap) {
+
+#ifdef TARGET_PARENT //家长
+
+    NSSet *dataSet = [[NSSet alloc]
+        initWithObjects:@"bbq.Family.LeDou18", @"bbq.Family.LeDou78",
+                        @"bbq.Family.LeDou45", @"bbq.Family.LeDou153", nil];
+#elif TARGET_TEACHER //老师
+
+    NSSet *dataSet = [[NSSet alloc]
+        initWithObjects:@"bbq.Teacher.LeDou18", @"bbq.Teacher.LeDou78",
+                        @"bbq.Teacher.LeDou45", @"bbq.Teacher.LeDou153", nil];
+#else
+
+    NSSet *dataSet = [[NSSet alloc]
+        initWithObjects:@"bbq.Master.LeDou18", @"bbq.Master.LeDou78",
+                        @"bbq.Master.LeDou45", @"bbq.Master.LeDou153", nil];
+#endif
+
+    [IAPShare sharedHelper].iap =
+        [[IAPHelper alloc] initWithProductIdentifiers:dataSet];
+  }
+  // 测试服 = NO
+  [IAPShare sharedHelper].iap.production = YES;
+
+  [[IAPShare sharedHelper]
+          .iap requestProductsWithCompletion:^(SKProductsRequest *request,
+                                               SKProductsResponse *response) {
+    if (response > 0) {
+      dispatch_async(dispatch_get_main_queue(), ^{
+        [SVProgressHUD dismiss];
+      });
+
+      __block SKProduct *product = nil;
+      [[IAPShare sharedHelper]
+              .iap.products
+          enumerateObjectsUsingBlock:^(SKProduct *abc, NSUInteger idx,
+                                       BOOL *stop) {
+            NSLog(@"%@", abc.productIdentifier);
+            if ([abc.productIdentifier isEqualToString:productID]) {
+              product = abc;
+              *stop = YES;
+            }
+          }];
+
+      [[IAPShare sharedHelper]
+              .iap
+            buyProduct:product
+          onCompletion:^(SKPaymentTransaction *trans) {
+
+            if (trans.error) {
+              NSLog(@"Fail %@", [trans.error localizedDescription]);
+              _reason = [trans.error localizedDescription];
+              _result = 4; //支付失败
+              NSDictionary *dic = @{
+                @"orderid" : self.orderid,
+                @"result" : @(4),
+                @"receipt" : @{},
+                @"reason" : @""
+              };
+              [self updateOrderWithDic:dic];
+              [CommonFunc showAlertView:@"支付取消或支付失败"];
+
+            } else if (trans.transactionState ==
+                       SKPaymentTransactionStatePurchased) {
+
+              NSURLRequest *urlRequest = [NSURLRequest
+                  requestWithURL:
+                      [[NSBundle mainBundle] appStoreReceiptURL]]; //苹果推荐
+              NSError *error = nil;
+              NSData *receiptData =
+                  [NSURLConnection sendSynchronousRequest:urlRequest
+                                        returningResponse:nil
+                                                    error:&error];
+              //
+              //                     NSData *jsonData = [NSJSONSerialization
+              //                     dataWithJSONObject:receiptData
+              //                     options:NSJSONWritingPrettyPrinted
+              //                     error:&error];
+              //                     NSDictionary *recDic = [IAPShare
+              //                     toJSON:response];
+              NSString *receiptBase64 =
+                  [NSString base64StringFromData:receiptData
+                                          length:[receiptData length]];
+
+              NSString *path = [NSSearchPathForDirectoriesInDomains(
+                  NSDocumentDirectory, NSUserDomainMask, YES) objectAtIndex:0];
+              NSString *fileName =
+                  [path stringByAppendingPathComponent:@"LeDouPay.plist"];
+              _result = 6; //成功
+              _reason = @"";
+              NSDictionary *dic = @{
+                @"order" : self.orderid,
+                @"dic" : receiptBase64,
+                @"result" : @(_result),
+                @"reason" : _reason
+              };
+              [dic writeToFile:fileName atomically:YES];
+              NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
+              [defaults setBool:NO forKey:@"ledouPay"];
+
+              [self updateOrderWithDic:dic];
+
+              //                     [[IAPShare sharedHelper].iap
+              //                     checkReceipt:trans.transactionReceipt
+              //                     AndSharedSecret:@"your sharesecret"
+              //                     onCompletion:^(NSString *response, NSError
+              //                     *error) {
+              //
+              //                         //Convert JSON String to NSDictionary
+              //                         NSDictionary* rec = [IAPShare
+              //                         toJSON:response];
+              //
+              //                         NSString *path =
+              //                         [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory,
+              //                         NSUserDomainMask, YES)
+              //                         objectAtIndex:0];
+              //                         NSString *fileName  = [path
+              //                         stringByAppendingPathComponent:@"LeDouPay.plist"];
+              //                         NSDictionary *dic = @{ @"order" :
+              //                         self.orderid,
+              //                                                @"dic" : rec};
+              //                         [dic writeToFile:fileName
+              //                         atomically:YES];
+              //
+              ////                         NSDictionary *diccc = [NSDictionary
+              ///dictionaryWithContentsOfFile:fileName];
+              //
+              //                         if([rec[@"status"] integerValue]==0)
+              //                         {
+              //                             _result = 1; //成功
+              //                             _reason = @"";
+              //                             [self updateOrderWithDic:rec];
+              //                             NSString *productIdentifier =
+              //                             trans.payment.productIdentifier;
+              //                             [[IAPShare sharedHelper].iap
+              //                             provideContent:productIdentifier];
+              //                             NSLog(@"SUCCESS %@",response);
+              //                             NSLog(@"Pruchases %@",[IAPShare
+              //                             sharedHelper].iap.purchasedProducts);
+              //
+              //                             [[NSNotificationCenter
+              //                             defaultCenter]
+              //                             postNotificationName:kSetNeedsRefreshEntireDataNotification
+              //                             object:nil userInfo:@{@"type":
+              //                             @(BBQRefreshNotificationTypeUserInfo)}];
+              //
+              //                         }
+              //                         else {
+              //                             NSLog(@"Fail");
+              //                             [CommonFunc
+              //                             showAlertView:@"购买失败"];
+              //                         }
+              //                     }];
+            } else if (trans.transactionState ==
+                       SKPaymentTransactionStateFailed) {
+              _reason = [trans.error localizedDescription];
+              _result = 4; //支付失败
+              [self updateOrderWithDic:@{}];
+              [CommonFunc showAlertView:@"支付取消或支付失败"];
+            }
+          }]; // end of buy product
+    }
+  }];
+}
+
+- (void)updateOrderWithDic:(NSDictionary *)dic {
+  //    NSDictionary *params = @{ @"orderid" : self.orderid,
+  //                              @"result" : @(_result),
+  //                              @"receipt" : dic,
+  //                              @"reason" : _reason};
+  [BBQHTTPRequest queryWithType:BBQHTTPRequestTypeiOSUpdateOrder
+      param:dic
+      successHandler:^(AFHTTPRequestOperation *operation,
+                       NSDictionary *responseObject, bool apiSuccess) {
+
+        NSLog(@"=-》%@", responseObject);
+        NSUserDefaults *de = [NSUserDefaults standardUserDefaults];
+        [de removeObjectForKey:@"ledouPay"];
+        [CommonFunc showAlertView:@"购买成功"];
+
+      }
+      errorHandler:^(NSDictionary *responseObject) {
+        NSLog(@"=-》%@", responseObject);
+        NSUserDefaults *de = [NSUserDefaults standardUserDefaults];
+        [de removeObjectForKey:@"ledouPay"];
+      }
+      failureHandler:^(AFHTTPRequestOperation *operation, NSError *error) {
+        NSUserDefaults *de = [NSUserDefaults standardUserDefaults];
+        BOOL rec = [de boolForKey:@"ledouPay"];
+        if (rec == NO) {
+          UIAlertView *alert = [UIAlertView
+              bk_showAlertViewWithTitle:@"提示"
+                                message:@"验"
+                                        @"证订单失败，会在网络通畅的情况下再次"
+                                        @"验证，请勿重复购买"
+                      cancelButtonTitle:@"取消"
+                      otherButtonTitles:@[
+                        @"重新验证"
+                      ] handler:^(UIAlertView *alertView,
+                                  NSInteger buttonIndex) {
+                        if (buttonIndex == 1) {
+                          NSString *path = [NSSearchPathForDirectoriesInDomains(
+                              NSDocumentDirectory, NSUserDomainMask, YES)
+                              objectAtIndex:0];
+                          NSString *fileName = [path
+                              stringByAppendingPathComponent:@"LeDouPay.plist"];
+                          NSDictionary *dic = [NSDictionary
+                              dictionaryWithContentsOfFile:fileName];
+                          [self updateOrderWithDic:dic];
+                        }
+                      }];
+          [alert show];
+        }
+
+      }];
+}
+
+//支付
+- (void)confirmToPay {
+
+  if (self.buyCardView.payWay == ChosedNull) {
+    [SVProgressHUD showInfoWithStatus:@"请先选择一种支付方式"];
+    return;
+  }
+
+  NSString *baobaouid = @"0";
+  if (TheCurBaoBao)
+    baobaouid = TheCurBaoBao.uid.stringValue;
+
+  [self bugLedou:baobaouid
+          czfaid:[[self.schema_cztype objectAtIndex:self.schema_cur_no]
+                     objectForKey:@"czfaid"]
+            czid:[[self.schema_cztype objectAtIndex:self.schema_cur_no]
+                     objectForKey:@"czid"]
+          revnum:[NSNumber numberWithInteger:self.arrBuyUid.count]
+      revuiddata:self.arrBuyUid
+         paytype:(self.buyCardView.payWay == ChosedPayWayAlipay ? @1 : @2)];
+}
+
+//处理手势，隐藏背景和支付方式
+- (void)dealTap {
+
+  _payStyleView.hidden = YES;
+  _BlackAlphaImageView.hidden = YES;
+  NSLog(@"处理点击手势。。。。。。。。。。。。。。。");
+}
+
+- (void)didReceiveMemoryWarning {
+  [super didReceiveMemoryWarning];
+  // Dispose of any resources that can be recreated.
+}
+
+- (float)caculateMoney:(int)num {
+  float money = [[[self.schema_cztype objectAtIndex:self.schema_cur_no]
+      objectForKey:@"price"] floatValue];
+
+  if ([self.qzk_flag intValue] == 0)
+    money = money * num;
+  else
+    money = money * [self.schema_discut intValue] * num / 100.0;
+
+  return money;
+}
+
+- (void)dispMoney {
+  self.totalPrice = [self caculateMoney:1];
+  self.moneyLabel.text = [NSString stringWithFormat:@"%.1f", self.totalPrice];
+}
+
+- (void)dispData {
+  if ([self.qzk_flag intValue] == 1) {
+    self.remindView.hidden = YES;
+    self.havingQzkView.hidden = NO;
+
+    //        self.lbQzkTip.text = [NSString
+    //        stringWithFormat:@"您已购买成长书，将享有乐豆充值%.1f折优惠!",[self.schema_discut
+    //        floatValue]/10.0];
+    self.lbQzkTip.text = [NSString
+        stringWithFormat:
+            @"您已购买成长书，将享有充值送乐豆优惠"];
+  } else {
+    self.remindView.hidden = NO;
+    self.havingQzkView.hidden = YES;
+  }
+
+  NSString *info;
+  if (TheCurBaoBao.gxid > 0) {
+    info = [NSString
+        stringWithFormat:@"%@%@", TheCurBaoBao.realname,
+                         [NSString relationshipWithID:TheCurBaoBao.gxid gxname:TheCurBaoBao.gxname]];
+  } else if (TheCurUser.member.nickname.length > 0) {
+    info = TheCurUser.member.nickname;
+  } else {
+    info = TheCurUser.member.username;
+  }
+
+  self.lbName.text = info;
+
+  self.lbLedouNum.text =
+      [NSString stringWithFormat:@"%d个", self.myledou.intValue];
+
+  [self.leDouTabVcl reloadCzdata:self.schema_cztype];
+}
+
+//详情界面
+- (void)dispDetailController {
+  UIStoryboard *sb = [UIStoryboard storyboardWithName:@"RootTabBar" bundle:nil];
+  OrderDetailViewController *vc =
+      [sb instantiateViewControllerWithIdentifier:@"OrderDetailViewController"];
+
+  NSString *strName = [NSString
+      stringWithFormat:@"%d乐豆",
+                       [[[self.schema_cztype objectAtIndex:self.schema_cur_no]
+                           objectForKey:@"ldcount"] intValue]];
+  vc.strName = strName;
+  vc.strDesc = @"";
+  vc.strOrdrer = self.orderid;
+  vc.strOrderTime = [CommonFunc getCurrentTime];
+  vc.strOrderMoney =
+      [NSString stringWithFormat:@"%.2f元", [self.orderprice floatValue]];
+  vc.strOrderUser = TheCurUser.member.nickname;
+  vc.charge = self.charge;
+  vc.buytype = BUY_LEDOU;
+  //可以定义回调
+
+  [self.navigationController pushViewController:vc animated:YES];
+}
+
+#pragma mark - Navigation
+
+// block要传过来的值
+- (void)prepareForSegue:(UIStoryboardSegue *)segue sender:(id)sender {
+  if ([segue.identifier isEqualToString:@"LeDouSegue"]) {
+
+    self.leDouTabVcl = segue.destinationViewController;
+    WS(weakSelf)
+    self.leDouTabVcl.block = ^(int no, int ledou) {
+      int curno = no % _schema_cztype.count;
+      _schema_cur_no = curno;
+      [weakSelf dispMoney];
+      weakSelf.leDouNum = ledou;
+      weakSelf.btnGive.enabled = YES;
+      weakSelf.btnPay.enabled = YES;
+    };
+  }
+}
+
+/// 网络请求数据
+- (void)downloadData {
+
+  NSLog(@"downloadData --------");
+
+  [SVProgressHUD showWithStatus:@"正在加载中"];
+
+  // 1.请求网址
+  NSString *URL = [CS_URL_BASE stringByAppendingString:URL_GET_CHARGE_SCHEME];
+  /**
+   * 2.请求参数
+   * baobaouid : 宝宝id
+   */
+
+  NSDictionary *params;
+  if (TheCurBaoBao)
+    params = @{ @"baobaouid" : TheCurUser.member.uid };
+  else
+    params = @{ @"baobaouid" : @"0" };
+
+  NSLog(@"url=%@", URL);
+  NSLog(@"params:%@", [params description]);
+
+  // 3.网络请求
+  [HttpTool postWithPath:URL
+      params:params
+      success:^(id JSON) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+          [SVProgressHUD dismiss];
+        });
+        NSDictionary *dic = JSON;
+        NSLog(@"json=%@", [dic description]);
+        // 返回状态
+        NSNumber *res = [dic objectForKeyedSubscript:@"res"];
+        // res为1表示请求成功
+        if ([res intValue] == 1) {
+          //            NSArray *tempAry = [dic objectForKey:@"data"];
+          //            for (NSDictionary *tempDic in tempAry) {
+          //                [self.dataAry addObject:tempDic];
+          //            }
+          NSLog(@"downloadata return success");
+
+          NSDictionary *tempDic = [dic objectForKey:@"data"];
+          // self.schema_czid = [tempDic objectForKey:@"id"];
+          self.schema_name = [tempDic objectForKey:@"name"];
+          self.schema_discut = [NSNumber
+              numberWithInt:[[tempDic objectForKey:@"discut"] intValue]];
+          self.schema_meno = [tempDic objectForKey:@"meno"];
+          self.schema_cztype = [tempDic objectForKey:@"cztype"];
+          self.qzk_flag = [NSNumber
+              numberWithInt:[[tempDic objectForKey:@"qzk_flag"] intValue]];
+
+          //传成长书开通状态
+          self.leDouTabVcl.czsState_Value = [self.qzk_flag intValue];
+          NSLog(@"要传的值。。。。%d", [self.qzk_flag intValue]);
+
+          self.myledou = [NSNumber
+              numberWithInt:[[tempDic objectForKey:@"myledou"] intValue]];
+          self.schema_cur_no = -1;
+
+          dispatch_async(dispatch_get_main_queue(), ^{
+            [self dispData];
+          });
+
+        }
+        // 请求失败
+        else {
+          dispatch_async(dispatch_get_main_queue(), ^{
+            // 返回的message
+            NSString *message = [NSString
+                stringWithFormat:@"%@", [dic objectForKeyedSubscript:@"msg"]];
+
+            UIAlertView *alert = [[UIAlertView alloc] initWithTitle:@"提示"
+                                                            message:message
+                                                           delegate:nil
+                                                  cancelButtonTitle:@"确定"
+                                                  otherButtonTitles:nil, nil];
+            [alert show];
+          });
+        }
+        // 更新headerView上的信息
+        dispatch_async(dispatch_get_main_queue(), ^{
+                           //[self updateHeaderView];
+                       });
+
+      }
+      failure:^(NSError *error) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+          [SVProgressHUD dismiss];
+          UIAlertView *alert =
+              [[UIAlertView alloc] initWithTitle:@"提示"
+                                         message:[error localizedDescription]
+                                        delegate:nil
+                               cancelButtonTitle:@"确定"
+                               otherButtonTitles:nil, nil];
+          [alert show];
+        });
+      }];
+}
+
+/// 购买乐豆订单接口
+- (void)bugLedou:(NSString *)baobaouid
+          czfaid:(NSNumber *)czfaid
+            czid:(NSNumber *)czid
+          revnum:(NSNumber *)revnum
+      revuiddata:(NSArray *)revuiddata
+         paytype:(NSNumber *)paytype {
+
+  [SVProgressHUD showWithStatus:@"请稍候..."];
+
+  NSDictionary *params = @{
+    @"baobaouid" : baobaouid,
+    @"czfaid" : czfaid,
+    @"czid" : czid,
+    @"revnum" : revnum,
+    @"revuiddata" : revuiddata,
+    @"paytype" : paytype
+  };
+
+  [BBQHTTPRequest
+       queryWithType:BBQHTTPRequestTypeBuyLedou
+               param:params
+      successHandler:^(AFHTTPRequestOperation *operation,
+                       NSDictionary *responseObject, bool apiSuccess) {
+        [SVProgressHUD dismiss];
+        dispatch_async(dispatch_get_main_queue(), ^{
+
+          NSDictionary *dic = responseObject;
+          NSDictionary *dicData = [dic objectForKey:@"data"];
+          self.orderid = pickJsonStrValue(dicData, @"orderid");
+          self.charge = [dicData objectForKey:@"charge"];
+          self.ordertime =
+              [NSNumber numberWithInteger:
+                            [[dicData objectForKey:@"ordertime"] integerValue]];
+          self.orderprice = [NSNumber
+              numberWithFloat:[[dicData objectForKey:@"price"] floatValue]];
+
+          [self.buyCardView hideSelf];
+          [self dispDetailController];
+
+        });
+
+      } errorHandler:nil
+      failureHandler:nil];
+}
+@end

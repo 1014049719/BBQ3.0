@@ -1,0 +1,1 @@
+../../../VKInputToolbar/UIInputToolbarSample/Classes/UIInputToolbar/UIExpandingTextView.h

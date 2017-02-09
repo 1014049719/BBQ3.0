@@ -1,0 +1,325 @@
+//
+//  OrderDetailViewController.m
+//  BBQ
+//
+//  Created by mwt on 15/7/28.
+//  Copyright (c) 2015年 bbq. All rights reserved.
+//
+
+#import "OrderDetailViewController.h"
+#import "JsonManager.h"
+
+#import "AppMacro.h"
+#import "NotificationMacro.h"
+#import <Pingpp.h>
+
+@interface OrderDetailViewController ()
+
+//亲子卡
+@property(weak, nonatomic) IBOutlet UIView *viewQzk;
+@property(weak, nonatomic) IBOutlet UILabel *lbQzkName;
+@property(weak, nonatomic) IBOutlet UILabel *lbQzkDesc;
+
+//乐豆
+@property(weak, nonatomic) IBOutlet UIView *ViewLeDou;
+@property(weak, nonatomic) IBOutlet UILabel *lbLdName;
+
+//共用
+@property(weak, nonatomic) IBOutlet UILabel *lbOrder;
+@property(weak, nonatomic) IBOutlet UILabel *lbOrderTime;
+@property (weak, nonatomic) IBOutlet UILabel *lbBookNum;
+@property(weak, nonatomic) IBOutlet UILabel *lbOrderMoney;
+@property(weak, nonatomic) IBOutlet UILabel *lbOrderPayUser;
+@property(weak, nonatomic) IBOutlet UILabel *lbRestTime;
+@property(nonatomic, strong) NSTimer *timer;
+@property(nonatomic, strong) NSNumber *result;
+
+@end
+
+@implementation OrderDetailViewController
+
+//静态全局时间
+static int _time = 1800;
+
+- (void)viewDidLoad {
+  [super viewDidLoad];
+  // Do any additional setup after loading the view.
+
+  if (self.buytype == BUY_QZK) {
+    self.viewQzk.hidden = NO;
+    self.ViewLeDou.hidden = YES;
+
+    self.lbQzkName.text = self.strName;
+    self.lbQzkDesc.text = self.strDesc;
+  } else {
+    self.viewQzk.hidden = YES;
+    self.ViewLeDou.hidden = NO;
+
+    self.lbLdName.text = self.strName;
+  }
+
+    self.lbOrder.text = self.strOrdrer;
+    self.lbOrderTime.text = self.strOrderTime;
+    self.lbBookNum.text=self.bookNum;
+    self.lbOrderMoney.text = self.strOrderMoney;
+    self.lbOrderPayUser.text = self.strOrderUser;
+
+  self.navigationItem.leftBarButtonItem =
+      [[UIBarButtonItem alloc] initWithTitle:@"返回"
+                                       style:UIBarButtonItemStyleBordered
+                                      target:self
+                                      action:@selector(back)];
+
+  self.timer = [NSTimer scheduledTimerWithTimeInterval:1.0f
+                                                target:self
+                                              selector:@selector(updateRestTime)
+                                              userInfo:nil
+                                               repeats:YES];
+
+  NSLog(@"------order=%@", self.strOrdrer);
+
+  //注册消息
+  [[NSNotificationCenter defaultCenter] addObserver:self
+                                           selector:@selector(BugResult:)
+                                               name:NOTIFICATION_Buy_Result
+                                             object:nil];
+}
+
+- (void)dealloc {
+
+  [[NSNotificationCenter defaultCenter] removeObserver:self];
+}
+
+- (void)back {
+  static BOOL bFirst = YES;
+
+  if (bFirst) {
+    bFirst = NO;
+
+    [self.timer invalidate];
+    //取消订单先
+    [self updatePayResult:self.strOrdrer
+                   result:@PAYRESULT_CANCEL
+                   reason:@"usercancel"];
+  } else {
+    [self.navigationController popViewControllerAnimated:YES];
+  }
+}
+
+- (void)didReceiveMemoryWarning {
+  [super didReceiveMemoryWarning];
+  // Dispose of any resources that can be recreated.
+}
+
+- (void)updateRestTime {
+
+  if (_time > 0) {
+    _time-=1;
+    self.lbRestTime.text =
+        [NSString stringWithFormat:@"%d:%02d", _time / 60, _time % 60];
+  } else {
+    [self.timer invalidate];
+  }
+}
+
+- (IBAction)didMakeAChoice:(UIButton *)button {
+
+  [self.timer invalidate];
+
+  [self jumpToPingpp];
+}
+
+- (IBAction)cancelAChoice:(UIButton *)button {
+  [self.timer invalidate];
+
+  [self updatePayResult:self.strOrdrer
+                 result:@PAYRESULT_CANCEL
+                 reason:@"usercancel"];
+}
+
+//调用ping＋＋接口
+//------------------------------------------------------
+- (void)jumpToPingpp {
+  NSString *urlscheme = BUY_QZK_URL;
+
+  if (self.buytype == BUY_LEDOU)
+    urlscheme = BUY_LEDOU_URL;
+
+  [Pingpp
+       createPayment:[JsonManager dictionaryToJson:self.charge]
+      viewController:nil
+        appURLScheme:urlscheme
+      withCompletion:^(NSString *result, PingppError *error) {
+        if ([result isEqualToString:@"success"]) {
+          // 支付成功
+          //更新支付结果
+          self.result = @PAYRESULT_SUCCESS;
+          [self updatePayResult:self.strOrdrer result:self.result reason:@""];
+        } else {
+          // 支付失败或取消
+          NSLog(@"Error: code=%lu msg=%@", (unsigned long)error.code,
+                [error getMsg]);
+        }
+      }];
+}
+
+//支付结果通知消息返回
+
+- (void)BugResult:(NSNotification *)note {
+  NSDictionary *dicUserData = note.userInfo;
+  NSNumber *result = [dicUserData objectForKey:@"result"];
+
+  NSLog(@"ping++ pay result:%d , order=%@", [result intValue], self.strOrdrer);
+
+  self.result = result;
+  [self updatePayResult:self.strOrdrer result:result reason:@""];
+}
+
+//更新支付结果
+- (void)updatePayResult:(NSString *)orderid
+                 result:(NSNumber *)result
+                 reason:(NSString *)reason {
+  NSDictionary *params = @{
+    @"orderid" : orderid,
+    @"result" : result,
+    @"reason" : reason
+  };
+
+  [SVProgressHUD showWithStatus:@"请稍候..."];
+  [BBQHTTPRequest
+       queryWithType:BBQHTTPRequestTypeUpdateOrderStatue
+               param:params
+      successHandler:^(AFHTTPRequestOperation *operation,
+                       NSDictionary *responseObject, bool apiSuccess) {
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+          [SVProgressHUD dismiss];
+           
+            _time = 1800;
+            
+          NSDictionary *dic = responseObject;
+          if (self.buytype == BUY_QZK) {
+            [self.navigationController popToRootViewControllerAnimated:YES];
+          } else {
+            if (self.navigationController.viewControllers.count >= 3) {
+              int count = (int)self.navigationController.viewControllers.count;
+              UIViewController *vc =
+                  self.navigationController.viewControllers[count - 3];
+              [self.navigationController popToViewController:vc animated:YES];
+            } else
+              [self.navigationController popToRootViewControllerAnimated:YES];
+          }
+
+          //            NSArray *resultDesc =
+          //            @[@"未支付",@"支付成功",@"支付成功",@"支付中",@"支付失败",@"支付取消"];
+          //            [SVProgressHUD showSuccessWithStatus:[resultDesc
+          //            objectAtIndex:([self.result intValue]%6)]];
+
+          //发送更新结果通知
+          [[NSNotificationCenter defaultCenter]
+              postNotificationName:NOTIFICATION_Update_BuyResult
+                            object:nil
+                          userInfo:dic];
+            
+          [[NSNotificationCenter defaultCenter]
+              postNotificationName:kSetNeedsRefreshEntireDataNotification
+                            object:nil
+                          userInfo:@{
+                            @"type" : @(BBQRefreshNotificationTypeUserInfo)
+                          }];
+        });
+
+      } errorHandler:^(NSDictionary *responseObject) {
+          
+          [SVProgressHUD showErrorWithStatus:@"更新出错"];
+      } failureHandler:^(AFHTTPRequestOperation *operation, NSError *error) {
+          
+          [SVProgressHUD showErrorWithStatus:@"更新失败"];
+      }];
+}
+
+//- (void)PostMsg:(NSString *)strUrl
+//                data:(NSDictionary *)data
+//      ResponseTarget:(id)target
+//    ResponseSelector:(SEL)selector {
+//  //先判断网络是否通，不通则加载本地数据
+//  if ([[Global instance] getNetworkStatus] == NotReachable) {
+//    return;
+//  }
+//
+//  NSDictionary *dicData = @{
+//    @"url" : [CS_URL_BASE stringByAppendingString:strUrl],
+//    @"data" : data
+//  };
+//
+//  [_bussMng cancelBussRequest];
+//  self.bussMng = [BussMng bussWithType:BMCommonPostMsg];
+//  [_bussMng request:target:selector:dicData];
+//
+//  return;
+//}
+
+//- (void)syncCallback_PostMsg:(TBussStatus *)sts {
+//  [_bussMng cancelBussRequest];
+//  self.bussMng = nil;
+//
+//  if (!sts || sts.iCode != 200) //失败
+//  {
+//    //网络调用不成功
+//    [SVProgressHUD showErrorWithStatus:@"网络失败，请检查网络"];
+//    return;
+//  }
+//
+//  // 200
+//  NSDictionary *dic = sts.rtnData;
+//  NSLog(@"dic:%@", [dic description]);
+//
+//  int res = pickJsonIntValue(sts.rtnData, @"res");
+//  // int cmdcode = pickJsonIntValue(sts.rtnData, @"cmdcode");
+//  if (res == 1) { //成功
+//
+//    NSLog(@"updatePayResult return success");
+//
+//    if (self.buytype == BUY_QZK) {
+//      [self.navigationController popToRootViewControllerAnimated:YES];
+//    } else {
+//      if (self.navigationController.viewControllers.count >= 3) {
+//        int count = (int)self.navigationController.viewControllers.count;
+//        UIViewController *vc =
+//            self.navigationController.viewControllers[count - 3];
+//        [self.navigationController popToViewController:vc animated:YES];
+//      } else
+//        [self.navigationController popToRootViewControllerAnimated:YES];
+//    }
+//
+//    NSArray *resultDesc = @[
+//      @"未支付",
+//      @"支付成功",
+//      @"支付成功",
+//      @"支付中",
+//      @"支付失败",
+//      @"支付取消"
+//    ];
+//    [SVProgressHUD
+//        showInfoWithStatus:[resultDesc
+//                               objectAtIndex:([self.result intValue] % 6)]];
+//
+//    //发送更新结果通知
+//    [[NSNotificationCenter defaultCenter]
+//        postNotificationName:NOTIFICATION_Update_BuyResult
+//                      object:nil
+//                    userInfo:dic];
+//    [[NSNotificationCenter defaultCenter]
+//        postNotificationName:kSetNeedsRefreshEntireDataNotification
+//                      object:nil
+//                    userInfo:@{
+//                      @"type" : @(BBQRefreshNotificationTypeUserInfo)
+//                    }];
+//
+//  } else { //失败
+//    NSString *msg = pickJsonStrValue(sts.rtnData, @"msg");
+//    [SVProgressHUD showErrorWithStatus:msg];
+//  }
+//}
+
+@end
